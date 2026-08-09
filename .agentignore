@@ -1,0 +1,19 @@
+# All .gitignore patterns apply (GIT-001)
+# See .gitignore
+
+# Agent dialogues and conversations (GIT-001, GIT-004)
+*_dialog.md
+*_chat.log
+conversation_*.txt
+*_prompt_*.md
+
+# Agent temp files
+*.tmp
+*.cache
+*.draft
+
+# Internal agent working notes (not for public repo)
+.ai/
+agent_notes/
+agent-memory/
+*.draft.md

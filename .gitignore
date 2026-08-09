@@ -1,0 +1,42 @@
+# Build outputs
+.output
+.data
+.nuxt
+.nitro
+.cache
+dist
+
+# Dependencies
+node_modules
+.venv
+vendor
+__pycache__
+
+# Logs
+logs
+*.log
+*.out
+*.err
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+*.secret
+*.pem
+*.key
+*.cer
+*.crt
+*.pkcs12
+
+# Editor and OS
+.vscode
+.idea
+.fleet
+.DS_Store
+Thumbs.db
+*.local
+
+# Test and coverage
+coverage
+*.test.log
