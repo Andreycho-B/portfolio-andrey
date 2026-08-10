@@ -1,0 +1,46 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    name: pnpm generate (SSG)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+        env:
+          NUXT_TELEMETRY_DISABLED: '1'
+
+      - name: Generate static site
+        run: pnpm generate
+        env:
+          NUXT_TELEMETRY_DISABLED: '1'
+
+      - name: Verify output
+        run: |
+          test -f .output/public/index.html
+          test -f .output/public/200.html
+          test -f .output/public/404.html
