@@ -21,9 +21,9 @@ void main() {
 
   // Three-color swirl
   vec3 color = uColor1 * phase1 + uColor2 * phase2 + uColor3 * phase3;
-  color *= gaussian * 0.6;
+  color *= gaussian * 0.3;
 
-  gl_FragColor = vec4(color, gaussian * 0.5);
+  gl_FragColor = vec4(color, gaussian * 0.25);
 }
 `
 

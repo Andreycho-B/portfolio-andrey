@@ -28,7 +28,7 @@ const props = withDefaults(defineProps<{
   fov?: number
   cameraZ?: number
 }>(), {
-  clearColor: 0x000000,
+  clearColor: 0xfafafa,
   fov: 75,
   cameraZ: 5,
 })
@@ -110,9 +110,9 @@ const setupScene = () => {
   if (shouldEnableBloom(tier)) {
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(width, height),
-      0.8,
-      0.6,
-      0.85,
+      0.4,
+      0.4,
+      0.9,
     )
     composer.addPass(bloomPass)
   }
@@ -147,9 +147,9 @@ const setupScene = () => {
   scene.add(gridMesh)
 
   const bokehColors = {
-    pink: new THREE.Color(0xff1493),
-    yellow: new THREE.Color(0xffff00),
-    cobalt: new THREE.Color(0x0020c2),
+    pink: new THREE.Color(0xff89c2),
+    yellow: new THREE.Color(0xfff1a8),
+    cobalt: new THREE.Color(0xa8c0ff),
   }
   const bokehMaterial = new THREE.ShaderMaterial({
     vertexShader: bokehVertexShader,
@@ -164,7 +164,7 @@ const setupScene = () => {
     depthTest: false,
     depthWrite: false,
     transparent: true,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
   })
   const bokehMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bokehMaterial)
   bokehMesh.frustumCulled = false
@@ -276,7 +276,7 @@ onBeforeUnmount(disposeAll)
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #000000;
+  background: #fafafa;
 }
 
 .webgl-canvas {

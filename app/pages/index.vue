@@ -50,8 +50,8 @@ const handleWebGLUnsupported = () => {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #000000;
-  color: #ffffff;
+  background: #fafafa;
+  color: #0a0a0a;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -77,7 +77,7 @@ const handleWebGLUnsupported = () => {
   font-weight: 500;
   letter-spacing: 0.125em;
   text-transform: uppercase;
-  color: #737373;
+  color: #525252;
 }
 
 .name {
@@ -87,7 +87,7 @@ const handleWebGLUnsupported = () => {
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.02em;
-  color: #ffffff;
+  color: #0a0a0a;
 }
 
 .status {
@@ -95,7 +95,7 @@ const handleWebGLUnsupported = () => {
   font-family: 'Inter', sans-serif;
   font-size: 1rem;
   font-weight: 400;
-  color: #737373;
+  color: #525252;
 }
 
 .fallback {
@@ -105,13 +105,13 @@ const handleWebGLUnsupported = () => {
   align-items: center;
   justify-content: center;
   padding: 2rem 1.5rem;
-  background: #000000;
+  background: #fafafa;
 }
 
 .fallback-msg {
   margin: 1.5rem 0 0;
   font-size: 0.875rem;
-  color: #737373;
+  color: #525252;
   max-width: 24rem;
   line-height: 1.5;
 }
