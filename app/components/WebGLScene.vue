@@ -4,6 +4,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import { gridFragmentShader, gridVertexShader } from '~/shaders/grid'
 import { detectWebGLTier, detectWebGLSupport, getDPR, shouldEnableBloom, shouldEnableRadialBlur, type WebGLTier } from '~/composables/useWebGLTier'
 
 interface SceneContext {
@@ -113,6 +114,34 @@ const setupScene = () => {
   }
 
   composer.addPass(new OutputPass())
+
+  const gridMaterial = new THREE.ShaderMaterial({
+    vertexShader: gridVertexShader,
+    fragmentShader: gridFragmentShader,
+    uniforms: {
+      uResolution: { value: new THREE.Vector2(width, height) },
+      uTime: { value: 0 },
+      uGridSize: { value: 40 },
+      uLineOpacity: { value: 0.03 },
+    },
+    depthTest: false,
+    depthWrite: false,
+    transparent: true,
+  })
+  const gridMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), gridMaterial)
+  gridMesh.frustumCulled = false
+  gridMesh.renderOrder = -1
+  scene.add(gridMesh)
+
+  const updateGrid = (_delta: number, elapsed: number) => {
+    gridMaterial.uniforms.uTime.value = elapsed
+  }
+  renderCallbacks.push(updateGrid)
+
+  const resizeGrid = (width: number, height: number) => {
+    gridMaterial.uniforms.uResolution.value.set(width, height)
+  }
+  resizeCallbacks.push(resizeGrid)
 
   timer = new THREE.Timer()
 
