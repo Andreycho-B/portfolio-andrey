@@ -6,8 +6,6 @@ export default defineNuxtConfig({
 
   modules: ['nuxt-security'],
 
-  css: ['~/assets/css/tokens.css'],
-
   security: {
     headers: {
       xFrameOptions: 'DENY',
