@@ -26,7 +26,7 @@ h1 {
   font-family: 'Playfair Display', Georgia, serif;
   font-size: 1.75rem;
   font-weight: 700;
-  color: #15131a;
+  color: #6b7280;
   letter-spacing: -0.01em;
   margin: 0;
 }
