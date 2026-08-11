@@ -4,7 +4,9 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { gridFragmentShader, gridVertexShader } from '~/shaders/grid'
+import { radialBlurShader } from '~/shaders/radialBlur'
 import { detectWebGLTier, detectWebGLSupport, getDPR, shouldEnableBloom, shouldEnableRadialBlur, type WebGLTier } from '~/composables/useWebGLTier'
 
 interface SceneContext {
@@ -42,6 +44,7 @@ let scene: THREE.Scene | null = null
 let camera: THREE.PerspectiveCamera | null = null
 let composer: EffectComposer | null = null
 let timer: THREE.Timer | null = null
+let radialBlurPass: ShaderPass | null = null
 let animationId: number | null = null
 let resizeObserver: ResizeObserver | null = null
 
@@ -111,6 +114,15 @@ const setupScene = () => {
       0.85,
     )
     composer.addPass(bloomPass)
+  }
+
+  if (shouldEnableRadialBlur(tier)) {
+    const radialPass = new ShaderPass(radialBlurShader as any)
+    radialPass.uniforms['uResolution'].value = new THREE.Vector2(width, height)
+    radialPass.uniforms['uVelocity'].value = 0
+    radialPass.uniforms['uBlurStrength'].value = 0.5
+    composer.addPass(radialPass)
+    radialBlurPass = radialPass
   }
 
   composer.addPass(new OutputPass())
@@ -183,6 +195,9 @@ const handleResize = () => {
   camera.updateProjectionMatrix()
   renderer.setSize(width, height)
   composer.setSize(width, height)
+  if (radialBlurPass) {
+    radialBlurPass.uniforms['uResolution'].value.set(width, height)
+  }
   for (const cb of resizeCallbacks) cb(width, height)
 }
 
@@ -212,6 +227,7 @@ const disposeAll = () => {
   renderer = null
   composer = null
   timer = null
+  radialBlurPass = null
 }
 
 onMounted(setupScene)
