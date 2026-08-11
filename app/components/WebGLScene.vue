@@ -134,7 +134,7 @@ const setupScene = () => {
     if (!timer || !composer) return
     timer.update()
     const delta = timer.getDelta()
-    const elapsed = timer.getElapsedTime()
+    const elapsed = timer.getElapsed()
     for (const cb of renderCallbacks) cb(delta, elapsed)
     composer.render()
   }
