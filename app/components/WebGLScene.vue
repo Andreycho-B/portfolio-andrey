@@ -34,7 +34,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 let renderer: THREE.WebGLRenderer | null = null
 let scene: THREE.Scene | null = null
 let camera: THREE.PerspectiveCamera | null = null
-let clock: THREE.Clock | null = null
+let timer: THREE.Timer | null = null
 let animationId: number | null = null
 let resizeObserver: ResizeObserver | null = null
 
@@ -116,7 +116,7 @@ const setupScene = () => {
   }
   resizeCallbacks.push(resizeGrid)
 
-  clock = new THREE.Clock()
+  timer = new THREE.Timer()
 
   emit('scene-ready', {
     scene,
@@ -131,9 +131,10 @@ const setupScene = () => {
 
   const animate = () => {
     animationId = requestAnimationFrame(animate)
-    if (!clock || !renderer || !scene || !camera) return
-    const delta = clock.getDelta()
-    const elapsed = clock.getElapsedTime()
+    if (!timer || !renderer || !scene || !camera) return
+    timer.update()
+    const delta = timer.getDelta()
+    const elapsed = timer.getElapsed()
     for (const cb of renderCallbacks) cb(delta, elapsed)
     renderer.render(scene, camera)
   }
@@ -178,7 +179,7 @@ const disposeAll = () => {
   scene = null
   camera = null
   renderer = null
-  clock = null
+  timer = null
 }
 
 onMounted(setupScene)
