@@ -7,6 +7,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { gridFragmentShader, gridVertexShader } from '~/shaders/grid'
 import { radialBlurShader } from '~/shaders/radialBlur'
+import { bokehFragmentShader, bokehVertexShader } from '~/shaders/bokeh'
 import { detectWebGLTier, detectWebGLSupport, getDPR, shouldEnableBloom, shouldEnableRadialBlur, type WebGLTier } from '~/composables/useWebGLTier'
 
 interface SceneContext {
@@ -145,13 +146,40 @@ const setupScene = () => {
   gridMesh.renderOrder = -1
   scene.add(gridMesh)
 
+  const bokehColors = {
+    pink: new THREE.Color(0xff1493),
+    yellow: new THREE.Color(0xffff00),
+    cobalt: new THREE.Color(0x0020c2),
+  }
+  const bokehMaterial = new THREE.ShaderMaterial({
+    vertexShader: bokehVertexShader,
+    fragmentShader: bokehFragmentShader,
+    uniforms: {
+      uResolution: { value: new THREE.Vector2(width, height) },
+      uTime: { value: 0 },
+      uColor1: { value: bokehColors.pink },
+      uColor2: { value: bokehColors.yellow },
+      uColor3: { value: bokehColors.cobalt },
+    },
+    depthTest: false,
+    depthWrite: false,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+  })
+  const bokehMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bokehMaterial)
+  bokehMesh.frustumCulled = false
+  bokehMesh.renderOrder = 0
+  scene.add(bokehMesh)
+
   const updateGrid = (_delta: number, elapsed: number) => {
     gridMaterial.uniforms.uTime.value = elapsed
+    bokehMaterial.uniforms.uTime.value = elapsed
   }
   renderCallbacks.push(updateGrid)
 
   const resizeGrid = (width: number, height: number) => {
     gridMaterial.uniforms.uResolution.value.set(width, height)
+    bokehMaterial.uniforms.uResolution.value.set(width, height)
   }
   resizeCallbacks.push(resizeGrid)
 
