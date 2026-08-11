@@ -16,6 +16,7 @@ import '@fontsource/playfair-display/700.css'
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  touch-action: none;
   background-color: #ffffff;
   margin: 0;
   padding: 0;
