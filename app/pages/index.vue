@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import '@fontsource/playfair-display/700.css'
 import WebGLScene from '~/components/WebGLScene.vue'
+import ClusterContra from '~/components/ClusterContra.vue'
+import type { SceneContext } from '~/components/WebGLScene.vue'
 
 const webglSupported = ref(true)
+const sceneCtx = ref<SceneContext | null>(null)
+
+const handleSceneReady = (ctx: SceneContext) => {
+  sceneCtx.value = ctx
+}
 
 const handleWebGLUnsupported = () => {
   webglSupported.value = false
@@ -15,9 +22,11 @@ const handleWebGLUnsupported = () => {
       v-if="webglSupported"
       :clear-color="0xffffff"
       :fov="75"
-      :camera-z="5"
+      :camera-z="8"
       @webgl-unsupported="handleWebGLUnsupported"
+      @scene-ready="handleSceneReady"
     >
+      <ClusterContra v-if="sceneCtx" :ctx="sceneCtx" />
       <div class="overlay">
         <h1 class="portfolio-text">portfolio</h1>
       </div>

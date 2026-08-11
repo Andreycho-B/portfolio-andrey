@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import * as THREE from 'three'
-import { gridFragmentShader, gridVertexShader } from '~/shaders/grid'
 import { detectWebGLSupport, getDPR, type WebGLTier } from '~/composables/useWebGLTier'
 
 export interface SceneContext {
@@ -87,34 +86,6 @@ const setupScene = () => {
   renderer.setPixelRatio(dpr)
   renderer.setSize(width, height)
   renderer.setClearColor(props.clearColor, 1)
-
-  const gridMaterial = new THREE.ShaderMaterial({
-    vertexShader: gridVertexShader,
-    fragmentShader: gridFragmentShader,
-    uniforms: {
-      uTime: { value: 0 },
-      uResolution: { value: new THREE.Vector2(width, height) },
-      uGridSize: { value: 40 },
-      uLineOpacity: { value: 0.05 },
-    },
-    depthTest: false,
-    depthWrite: false,
-    transparent: true,
-  })
-  const gridMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), gridMaterial)
-  gridMesh.frustumCulled = false
-  gridMesh.renderOrder = -1
-  scene.add(gridMesh)
-
-  const updateGrid = (_delta: number, elapsed: number) => {
-    gridMaterial.uniforms.uTime.value = elapsed
-  }
-  renderCallbacks.push(updateGrid)
-
-  const resizeGrid = (width: number, height: number) => {
-    gridMaterial.uniforms.uResolution.value.set(width, height)
-  }
-  resizeCallbacks.push(resizeGrid)
 
   timer = new THREE.Timer()
 
