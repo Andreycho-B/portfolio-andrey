@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource/playfair-display": "^5.3.0",
     "nuxt": "^4.5.2",
+    "nuxt-security": "^2.6.0",
     "vue": "^3.5.40"
   }
 }
