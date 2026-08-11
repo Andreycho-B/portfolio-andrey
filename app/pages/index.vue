@@ -29,24 +29,24 @@ const handleWebGLUnsupported = () => {
     >
       <ClusterContra v-if="sceneCtx" :ctx="sceneCtx" />
       <div class="overlay">
-        <header class="header">
-          <p class="role">Portfolio</p>
-          <h1 class="name">Andrey Rondón</h1>
-          <p class="status">AI Agent Engineer · En construcción</p>
-        </header>
+        <div class="brand-row" aria-label="Marca central del portafolio de proyectos">
+          <span class="brand-tagline">GET MORE CREATIVE</span>
+          <span class="brand-glyph" aria-hidden="true">&#10038;</span>
+          <span class="brand-name">contra</span>
+        </div>
       </div>
     </WebGLScene>
 
     <div v-if="!webglSupported" class="fallback">
-      <header class="header">
-        <p class="role">Portfolio</p>
-        <h1 class="name">Andrey Rondón</h1>
-        <p class="status">AI Agent Engineer</p>
-        <p class="fallback-msg">
-          Tu navegador no soporta WebGL2. Para experimentar el portafolio completo
-          usa Chrome, Edge o Firefox reciente.
-        </p>
-      </header>
+      <div class="brand-row">
+        <span class="brand-tagline">GET MORE CREATIVE</span>
+        <span class="brand-glyph" aria-hidden="true">&#10038;</span>
+        <span class="brand-name">contra</span>
+      </div>
+      <p class="fallback-msg">
+        WebGL2 no está disponible en este navegador. Para ver el cluster de
+        proyectos usa Chrome, Edge o Firefox reciente.
+      </p>
     </div>
   </main>
 </template>
@@ -73,55 +73,64 @@ const handleWebGLUnsupported = () => {
   z-index: 1;
 }
 
-.header {
-  max-width: 32rem;
-  text-align: center;
+.brand-row {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(1.5rem, 4vw, 3rem);
 }
 
-.role {
-  margin: 0 0 0.75rem;
+.brand-tagline {
   font-family: 'Inter', sans-serif;
-  font-size: 0.875rem;
-  font-weight: 500;
-  letter-spacing: 0.125em;
-  text-transform: uppercase;
-  color: #525252;
-}
-
-.name {
-  margin: 0 0 1rem;
-  font-family: 'Playfair Display', serif;
-  font-size: clamp(2.5rem, 8vw, 5rem);
+  font-size: clamp(0.875rem, 1.5vw, 1.25rem);
   font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
   color: #0a0a0a;
 }
 
-.status {
-  margin: 0;
+.brand-glyph {
   font-family: 'Inter', sans-serif;
-  font-size: 1rem;
+  font-size: clamp(1.25rem, 2.5vw, 2rem);
   font-weight: 400;
-  color: #525252;
+  color: #0020c2;
+  line-height: 1;
+}
+
+.brand-name {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(1.5rem, 3vw, 2.5rem);
+  font-weight: 700;
+  color: #0a0a0a;
+  letter-spacing: -0.01em;
 }
 
 .fallback {
   position: fixed;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1.5rem;
   padding: 2rem 1.5rem;
   background: #fafafa;
 }
 
 .fallback-msg {
-  margin: 1.5rem 0 0;
+  margin: 0;
+  font-family: 'Inter', sans-serif;
   font-size: 0.875rem;
   color: #525252;
   max-width: 24rem;
   line-height: 1.5;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none;
+    transition: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
