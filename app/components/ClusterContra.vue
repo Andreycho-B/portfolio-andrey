@@ -216,8 +216,6 @@ onBeforeUnmount(() => {
   bodies.length = 0
   sharedGeometry = null
 })
-
-defineExpose({ meshes, bodies, prefersReducedMotion })
 </script>
 
 <template>

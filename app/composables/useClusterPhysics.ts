@@ -114,5 +114,3 @@ export function applyScrollImpulse(
     applyImpulse(body, force)
   }
 }
-
-export type { ClusterBody as _ClusterBody }

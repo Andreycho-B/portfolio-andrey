@@ -31,7 +31,7 @@ const handleWebGLUnsupported = () => {
       <div class="overlay">
         <div class="brand-row" aria-label="Marca central del portafolio de proyectos">
           <span class="brand-tagline">GET MORE CREATIVE</span>
-<span class="brand-glyph" aria-hidden="true">&#10022;</span>
+          <span class="brand-glyph" aria-hidden="true">&#10022;</span>
           <span class="brand-name">contra</span>
         </div>
       </div>
@@ -40,7 +40,7 @@ const handleWebGLUnsupported = () => {
     <div v-if="!webglSupported" class="fallback">
       <div class="brand-row">
         <span class="brand-tagline">GET MORE CREATIVE</span>
-        <span class="brand-glyph" aria-hidden="true">&#10038;</span>
+        <span class="brand-glyph" aria-hidden="true">&#10022;</span>
         <span class="brand-name">contra</span>
       </div>
       <p class="fallback-msg">
@@ -124,13 +124,6 @@ const handleWebGLUnsupported = () => {
   max-width: 24rem;
   line-height: 1.5;
   text-align: center;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation: none;
-    transition: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

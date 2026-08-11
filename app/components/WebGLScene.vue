@@ -275,7 +275,12 @@ onBeforeUnmount(disposeAll)
 
 <template>
   <div class="webgl-container">
-    <canvas ref="canvasRef" class="webgl-canvas" />
+    <canvas
+      ref="canvasRef"
+      class="webgl-canvas"
+      role="img"
+      aria-label="Portafolio de Andrey Rondón — cluster de ocho proyectos dispuestos en arco, red influencia Contra."
+    />
     <slot />
   </div>
 </template>
