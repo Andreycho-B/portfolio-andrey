@@ -5,13 +5,15 @@ import type { SceneContext } from '~/components/WebGLScene.vue'
 
 const CARD_COUNT = 8
 const PROJECT_COUNT = 4
-const CARD_WIDTH = 1.2
-const CARD_HEIGHT = 1.6
+const CARD_WIDTH = 2.0
+const CARD_HEIGHT = 2.6
 const CARD_SEGMENTS = 32
-const SPACING = 1.8
-const ARC_CURVATURE = 0.3
-const ARC_RADIUS = 6.0
-const RECYCLE_THRESHOLD = (CARD_COUNT / 2) * SPACING
+const SPACING = 2.2
+const ARC_DEPTH = 3.0
+const ARC_AMPLITUDE = 1.2
+const ARC_FREQUENCY = 0.35
+const MESH_CURVATURE = 0.8
+const SPAN = (CARD_COUNT - 1) * SPACING
 
 const PROJECTS = [
   { color: 0x1B2A5E },
@@ -31,26 +33,31 @@ const materials: THREE.ShaderMaterial[] = []
 let sharedGeometry: THREE.PlaneGeometry | null = null
 let renderCallback: ((deltaTime: number, elapsedTime: number) => void) | null = null
 
-const cardPositions: number[] = []
+const cardOffsets: number[] = []
+
+const computeArcPoint = (t: number, out: THREE.Vector3) => {
+  out.set(
+    t,
+    Math.sin(t * ARC_FREQUENCY) * ARC_AMPLITUDE,
+    -((t * t) / SPAN) * ARC_DEPTH,
+  )
+}
 
 const buildCluster = () => {
   sharedGeometry = new THREE.PlaneGeometry(CARD_WIDTH, CARD_HEIGHT, CARD_SEGMENTS, CARD_SEGMENTS)
 
   for (let i = 0; i < CARD_COUNT; i++) {
-    const arcOffset = (i - (CARD_COUNT - 1) / 2) * SPACING
-    const angle = arcOffset / ARC_RADIUS
-    const x = Math.sin(angle) * ARC_RADIUS
-    const z = Math.cos(angle) * ARC_RADIUS - ARC_RADIUS
-    cardPositions.push(arcOffset)
+    const t = (i - (CARD_COUNT - 1) / 2) * SPACING
+    cardOffsets.push(t)
 
-    const projectIndex = i % PROJECT_COUNT
+    const projectIndex = Math.abs(i % PROJECT_COUNT)
     const project = PROJECTS[projectIndex]
 
     const material = new THREE.ShaderMaterial({
       vertexShader: cardVertexShader,
       fragmentShader: cardFragmentShader,
       uniforms: {
-        uCurvature: { value: ARC_CURVATURE },
+        uCurvature: { value: MESH_CURVATURE },
         uTime: { value: 0 },
         uResolution: { value: new THREE.Vector2(CARD_WIDTH, CARD_HEIGHT) },
         uColor: { value: new THREE.Color(project.color) },
@@ -62,8 +69,19 @@ const buildCluster = () => {
     })
 
     const mesh = new THREE.Mesh(sharedGeometry, material)
-    mesh.position.set(x, 0, z)
-    mesh.lookAt(0, 0, 0)
+
+    const p = new THREE.Vector3()
+    computeArcPoint(t, p)
+    mesh.position.copy(p)
+
+    const tangent = new THREE.Vector3()
+    const ahead = new THREE.Vector3()
+    computeArcPoint(t + 0.1, ahead)
+    tangent.subVectors(ahead, p).normalize()
+    const up = new THREE.Vector3(0, 1, 0)
+    const target = new THREE.Vector3().addVectors(p, tangent)
+    mesh.lookAt(target)
+
     mesh.userData = { cardIndex: i, projectIndex }
 
     props.ctx.scene.add(mesh)
@@ -74,35 +92,40 @@ const buildCluster = () => {
   let offset = 0
 
   renderCallback = (_delta: number, elapsed: number) => {
-    offset += 0.003
+    offset += 0.01
 
     for (let i = 0; i < CARD_COUNT; i++) {
       const mesh = meshes[i]
       const material = materials[i]
       material.uniforms.uTime.value = elapsed
 
-      let pos = cardPositions[i] + offset
+      let t = cardOffsets[i] + offset
+      const limit = SPAN / 2 + SPACING
 
-      while (pos > RECYCLE_THRESHOLD) {
-        pos -= CARD_COUNT * SPACING
-        cardPositions[i] -= CARD_COUNT * SPACING
-        const newProjectIndex = (Math.floor((cardPositions[i] + 1000) / SPACING) % PROJECT_COUNT + PROJECT_COUNT) % PROJECT_COUNT
-        mesh.userData.projectIndex = newProjectIndex
-        material.uniforms.uColor.value = new THREE.Color(PROJECTS[newProjectIndex].color)
+      while (t > limit) {
+        t -= SPAN + SPACING * 2
+        cardOffsets[i] -= SPAN + SPACING * 2
+        const idx = Math.abs(Math.round(cardOffsets[i] / SPACING) % PROJECT_COUNT)
+        mesh.userData.projectIndex = idx
+        material.uniforms.uColor.value = new THREE.Color(PROJECTS[idx].color)
       }
-      while (pos < -RECYCLE_THRESHOLD) {
-        pos += CARD_COUNT * SPACING
-        cardPositions[i] += CARD_COUNT * SPACING
-        const newProjectIndex = (Math.floor((cardPositions[i] + 1000) / SPACING) % PROJECT_COUNT + PROJECT_COUNT) % PROJECT_COUNT
-        mesh.userData.projectIndex = newProjectIndex
-        material.uniforms.uColor.value = new THREE.Color(PROJECTS[newProjectIndex].color)
+      while (t < -limit) {
+        t += SPAN + SPACING * 2
+        cardOffsets[i] += SPAN + SPACING * 2
+        const idx = Math.abs(Math.round(cardOffsets[i] / SPACING) % PROJECT_COUNT)
+        mesh.userData.projectIndex = idx
+        material.uniforms.uColor.value = new THREE.Color(PROJECTS[idx].color)
       }
 
-      const angle = pos / ARC_RADIUS
-      const x = Math.sin(angle) * ARC_RADIUS
-      const z = Math.cos(angle) * ARC_RADIUS - ARC_RADIUS
-      mesh.position.set(x, 0, z)
-      mesh.lookAt(0, 0, 0)
+      const p = new THREE.Vector3()
+      computeArcPoint(t, p)
+      mesh.position.copy(p)
+
+      const ahead = new THREE.Vector3()
+      computeArcPoint(t + 0.1, ahead)
+      const tangent = new THREE.Vector3().subVectors(ahead, p).normalize()
+      const target = new THREE.Vector3().addVectors(p, tangent)
+      mesh.lookAt(target)
     }
   }
 
@@ -132,4 +155,3 @@ onBeforeUnmount(() => {
 <template>
   <span aria-hidden="true" style="display: none" />
 </template>
-

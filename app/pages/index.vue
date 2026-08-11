@@ -21,8 +21,8 @@ const handleWebGLUnsupported = () => {
     <WebGLScene
       v-if="webglSupported"
       :clear-color="0xffffff"
-      :fov="75"
-      :camera-z="8"
+      :fov="60"
+      :camera-z="6"
       @webgl-unsupported="handleWebGLUnsupported"
       @scene-ready="handleSceneReady"
     >

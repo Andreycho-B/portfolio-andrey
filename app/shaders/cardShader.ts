@@ -4,17 +4,17 @@ export const cardVertexShader = /* glsl */ `
   uniform vec2 uResolution;
 
   varying vec2 vUv;
-  varying float vCurvature;
+  varying float vBend;
 
   void main() {
     vUv = uv;
-    vCurvature = uCurvature;
 
-    vec3 pos = position;
-    float x = pos.x;
-    pos.z = -uCurvature * x * x;
+    vec3 transformed = position;
+    float bend = pow(uv.x - 0.5, 2.0) * uCurvature;
+    transformed.z -= bend;
+    vBend = bend;
 
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
   }
 `
 
@@ -25,7 +25,7 @@ export const cardFragmentShader = /* glsl */ `
   uniform float uOpacity;
 
   varying vec2 vUv;
-  varying float vCurvature;
+  varying float vBend;
 
   float roundedBoxSDF(vec2 p, vec2 b, float r) {
     vec2 q = abs(p) - b + r;
@@ -42,8 +42,8 @@ export const cardFragmentShader = /* glsl */ `
     float alpha = 1.0 - smoothstep(-aa, aa, dist);
 
     vec3 color = uColor;
-    float edgeGlow = smoothstep(0.45, 0.5, length(p));
-    color = mix(color, color * 0.85, edgeGlow * 0.3);
+    float lighting = 1.0 - abs(vBend) * 0.5;
+    color *= lighting;
 
     gl_FragColor = vec4(color, alpha * uOpacity);
   }
