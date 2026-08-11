@@ -10,10 +10,12 @@ import '@fontsource/playfair-display/700.css'
 
 <style scoped>
 .page {
+  position: fixed;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  overflow: hidden;
   background-color: #ffffff;
   margin: 0;
   padding: 0;
