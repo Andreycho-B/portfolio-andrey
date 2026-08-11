@@ -16,6 +16,16 @@ export default defineNuxtConfig({
         microphone: [],
         'interest-cohort': [],
       },
+      contentSecurityPolicy: {
+        'script-src': [
+          "'self'",
+          "https:",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
+          "'strict-dynamic'",
+          "'nonce-{{nonce}}'",
+        ],
+      },
     },
   },
 
