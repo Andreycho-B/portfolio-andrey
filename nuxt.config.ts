@@ -1,9 +1,12 @@
-// https://nuxt.com/docs/api/configuration/nuxt-config
+import { fileURLToPath } from 'node:url'
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
 
   modules: ['nuxt-security'],
+
+  css: ['~/assets/css/tokens.css'],
 
   security: {
     headers: {
@@ -21,20 +24,10 @@ export default defineNuxtConfig({
           "'self'",
           "https:",
           "'unsafe-inline'",
-          "'unsafe-eval'",
           "'strict-dynamic'",
           "'nonce-{{nonce}}'",
         ],
       },
-    },
-  },
-
-  vite: {
-    optimizeDeps: {
-      include: ['three'],
-    },
-    ssr: {
-      noExternal: ['three'],
     },
   },
 })

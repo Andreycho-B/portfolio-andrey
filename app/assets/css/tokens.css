@@ -1,0 +1,36 @@
+:root {
+  --color-canvas: #F4EEE4;
+  --color-canvas-soft: #FAF6EE;
+  --color-ink: #15131A;
+  --color-ink-muted: #5B5660;
+  --color-card-border: #FFFFFF;
+
+  --color-navy: #1B2A5E;
+  --color-amber: #E89A3F;
+  --color-sand: #E5D7C0;
+  --color-crimson: #B83A2A;
+  --color-cobalt: #2747A8;
+  --color-lagoon: #7A8FCC;
+  --color-lagoon-deep: #3F4D8C;
+  --color-sand-ink: #3A2E1F;
+
+  --radius-tile: 24px;
+  --radius-tile-lg: 28px;
+
+  --shadow-tile: 0 1px 2px rgba(20, 18, 26, 0.04), 0 8px 24px rgba(20, 18, 26, 0.06);
+  --shadow-tile-up: 0 2px 4px rgba(20, 18, 26, 0.05), 0 18px 40px rgba(20, 18, 26, 0.10);
+
+  --space-tile: 220px;
+  --space-gutter: 28px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
