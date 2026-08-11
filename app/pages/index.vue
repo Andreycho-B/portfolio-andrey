@@ -3,8 +3,14 @@ import '@fontsource/inter/400.css'
 import '@fontsource/inter/500.css'
 import '@fontsource/inter/700.css'
 import '@fontsource/playfair-display/700.css'
+import type { Scene } from 'three'
 
 const webglSupported = ref(true)
+const sceneRef = ref<Scene | null>(null)
+
+const handleSceneReady = (ctx: { scene: Scene }) => {
+  sceneRef.value = ctx.scene
+}
 
 const handleWebGLUnsupported = () => {
   webglSupported.value = false
@@ -15,11 +21,13 @@ const handleWebGLUnsupported = () => {
   <main class="page">
     <WebGLScene
       v-if="webglSupported"
-      :clear-color="0x000000"
+      :clear-color="0xfafafa"
       :fov="75"
       :camera-z="5"
       @webgl-unsupported="handleWebGLUnsupported"
+      @scene-ready="handleSceneReady"
     >
+      <ClusterContra v-if="sceneRef" :scene="sceneRef" />
       <div class="overlay">
         <header class="header">
           <p class="role">Portfolio</p>
