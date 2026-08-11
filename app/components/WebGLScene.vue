@@ -17,11 +17,14 @@ interface SceneContext {
   composer: EffectComposer | null
   timer: THREE.Timer
   tier: WebGLTier
+  updateRadialBlurVelocity?: (value: number) => void
   registerRenderCallback: (cb: (deltaTime: number, elapsedTime: number) => void) => void
   unregisterRenderCallback: (cb: (deltaTime: number, elapsedTime: number) => void) => void
   registerResizeCallback: (cb: (width: number, height: number) => void) => void
   unregisterResizeCallback: (cb: (width: number, height: number) => void) => void
 }
+
+export type { SceneContext }
 
 const props = withDefaults(defineProps<{
   clearColor?: number
@@ -185,6 +188,13 @@ const setupScene = () => {
 
   timer = new THREE.Timer()
 
+  const updateRadialBlurVelocity = shouldEnableRadialBlur(tier) && radialBlurPass
+    ? (value: number) => {
+        const pass = radialBlurPass as ShaderPass | null
+        if (pass) pass.uniforms['uVelocity'].value = value
+      }
+    : undefined
+
   emit('scene-ready', {
     scene,
     camera,
@@ -192,6 +202,7 @@ const setupScene = () => {
     composer,
     timer,
     tier,
+    updateRadialBlurVelocity,
     registerRenderCallback,
     unregisterRenderCallback,
     registerResizeCallback,

@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import * as THREE from 'three'
 import { bulgeVertexShader, bulgeFragmentShader } from '~/shaders/bulge'
+import {
+  createClusterBody,
+  createClusterFrameOptions,
+  composeClusterFrame,
+  applyScrollImpulse,
+  type ClusterBody,
+  type ClusterFrameOptions,
+} from '~/composables/useClusterPhysics'
+import type { SceneContext } from '~/components/WebGLScene.vue'
 
 interface ClusterCard {
   id: string
@@ -106,7 +115,7 @@ const ARC_CARDS: ClusterCard[] = [
 ]
 
 interface Props {
-  scene: THREE.Scene
+  ctx: SceneContext
 }
 
 const props = defineProps<Props>()
@@ -114,6 +123,10 @@ const props = defineProps<Props>()
 const meshes: THREE.Mesh[] = []
 const materials: THREE.ShaderMaterial[] = []
 let sharedGeometry: THREE.PlaneGeometry | null = null
+const bodies: ClusterBody[] = []
+let frameOptions: ClusterFrameOptions | null = null
+let renderCallback: ((deltaTime: number, elapsedTime: number) => void) | null = null
+let wheelHandler: ((event: WheelEvent) => void) | null = null
 
 const CARD_WIDTH = 1.1
 const CARD_HEIGHT = 0.75
@@ -148,21 +161,51 @@ const buildCluster = () => {
       cardId: card.id,
       cardLabel: card.label,
       placeholderNote: card.placeholderNote,
-      homePosition: card.position.slice() as [number, number, number],
-      homeRotation: card.rotation.slice() as [number, number, number],
     }
 
-    props.scene.add(mesh)
+    props.ctx.scene.add(mesh)
     meshes.push(mesh)
     materials.push(material)
+
+    const mass = 1.0 + (card.scale - 0.5) * 0.4
+    bodies.push(createClusterBody(card.id, mesh, mass))
+  }
+
+  frameOptions = createClusterFrameOptions(new THREE.Vector3(0, 0, -0.3))
+
+  if (!prefersReducedMotion) {
+    renderCallback = (deltaTime: number) => {
+      if (!frameOptions) return
+      const speed = composeClusterFrame(bodies, frameOptions, Math.min(deltaTime, 0.033))
+      if (props.ctx.updateRadialBlurVelocity) {
+        props.ctx.updateRadialBlurVelocity(speed)
+      }
+    }
+    props.ctx.registerRenderCallback(renderCallback)
+
+    wheelHandler = (event: WheelEvent) => {
+      if (!bodies.length) return
+      event.preventDefault()
+      const delta = Math.sign(event.deltaY) * Math.min(Math.abs(event.deltaY), 80) / 80
+      applyScrollImpulse(bodies, delta, 0.6)
+    }
+    window.addEventListener('wheel', wheelHandler, { passive: false })
   }
 }
 
 onMounted(buildCluster)
 
 onBeforeUnmount(() => {
+  if (renderCallback && props.ctx.unregisterRenderCallback) {
+    props.ctx.unregisterRenderCallback(renderCallback)
+    renderCallback = null
+  }
+  if (wheelHandler) {
+    window.removeEventListener('wheel', wheelHandler)
+    wheelHandler = null
+  }
   for (const mesh of meshes) {
-    props.scene.remove(mesh)
+    props.ctx.scene.remove(mesh)
   }
   for (const material of materials) {
     material.dispose()
@@ -170,10 +213,11 @@ onBeforeUnmount(() => {
   sharedGeometry?.dispose()
   meshes.length = 0
   materials.length = 0
+  bodies.length = 0
   sharedGeometry = null
 })
 
-defineExpose({ meshes, prefersReducedMotion })
+defineExpose({ meshes, bodies, prefersReducedMotion })
 </script>
 
 <template>

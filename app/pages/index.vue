@@ -3,13 +3,13 @@ import '@fontsource/inter/400.css'
 import '@fontsource/inter/500.css'
 import '@fontsource/inter/700.css'
 import '@fontsource/playfair-display/700.css'
-import type { Scene } from 'three'
+import type { SceneContext } from '~/components/WebGLScene.vue'
 
 const webglSupported = ref(true)
-const sceneRef = ref<Scene | null>(null)
+const sceneCtx = ref<SceneContext | null>(null)
 
-const handleSceneReady = (ctx: { scene: Scene }) => {
-  sceneRef.value = ctx.scene
+const handleSceneReady = (ctx: SceneContext) => {
+  sceneCtx.value = ctx
 }
 
 const handleWebGLUnsupported = () => {
@@ -27,7 +27,7 @@ const handleWebGLUnsupported = () => {
       @webgl-unsupported="handleWebGLUnsupported"
       @scene-ready="handleSceneReady"
     >
-      <ClusterContra v-if="sceneRef" :scene="sceneRef" />
+      <ClusterContra v-if="sceneCtx" :ctx="sceneCtx" />
       <div class="overlay">
         <header class="header">
           <p class="role">Portfolio</p>
