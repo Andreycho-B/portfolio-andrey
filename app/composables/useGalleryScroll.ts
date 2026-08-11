@@ -7,9 +7,9 @@ export interface ScrollState {
   last: number
 }
 
-const WHEEL_SENS = 0.0028
-const TOUCH_SENS = 0.011
-const DRAG_SENS = 0.011
+const WHEEL_SENS = 0.035
+const TOUCH_SENS = 0.025
+const DRAG_SENS = 0.025
 const DRIFT_RATE = 0.0003
 const DRIFT_RESUME_DELAY = 1200
 
@@ -32,7 +32,7 @@ export function useGalleryScroll() {
 
   const onWheel = (e: WheelEvent) => {
     e.preventDefault()
-    state.target += e.deltaY * WHEEL_SENS + e.deltaX * WHEEL_SENS
+    state.target += e.deltaY * WHEEL_SENS
     markInputActive()
   }
 

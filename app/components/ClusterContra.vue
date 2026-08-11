@@ -10,12 +10,12 @@ const PROJECT_COUNT = 4
 const CARD_WIDTH = 2.0
 const CARD_HEIGHT = 2.6
 const CARD_SEGMENTS = 32
-const SPACING = 4.0
-const Y_OFFSET = 1.6
-const VERTICAL_CURVE = 0.008
-const ARC_DEPTH = 3.5
-const SPAN_CAPE = SPACING * 3.0
+const SPACING = 3.5
+const Y_OFFSET = 2.2
+const VERTICAL_CURVE = 0.08
+const ARC_DEPTH = 3.0
 const SCALE_FALLOFF = 0.45
+const SPAN_CAPE = SPACING * 3.0
 const MESH_CURVATURE = 0.8
 const STRETCH_FACTOR = 0.6
 const ROTATION_BLEND = 0.25
@@ -39,6 +39,7 @@ const materials: THREE.ShaderMaterial[] = []
 const textures: THREE.Texture[] = []
 let sharedGeometry: THREE.PlaneGeometry | null = null
 let renderCallback: ((deltaTime: number, elapsedTime: number) => void) | null = null
+let texturesReady = false
 
 const cardOffsets: number[] = []
 const cardArcUpper: boolean[] = []
@@ -52,50 +53,47 @@ const { state: scroll, step: scrollStep, bind: bindScroll, unbind: unbindScroll 
 const { resume: resumeAudio, playClick } = useAudioClick()
 
 const computeArcPoint = (t: number, isUpper: boolean, out: THREE.Vector3) => {
-  const r = t / SPAN_CAPE
-  const r2 = r * r
-  const cape = Math.min(1.0, r2)
-  const y = isUpper
-    ? Y_OFFSET + VERTICAL_CURVE * t * t
-    : -(Y_OFFSET + VERTICAL_CURVE * t * t)
-  const z = -ARC_DEPTH * cape
-  out.set(t, y, z)
+  const x = t
+  const yBase = isUpper ? Y_OFFSET : -Y_OFFSET
+  const yParabola = t * t * VERTICAL_CURVE
+  const y = isUpper ? yBase + yParabola : yBase - yParabola
+  const z = -ARC_DEPTH * Math.min(1.0, (t / SPAN_CAPE) * (t / SPAN_CAPE))
+  out.set(x, y, z)
 }
 
 const computeScale = (t: number) => {
   const r2 = (t / SPAN_CAPE) * (t / SPAN_CAPE)
-  const cape = Math.min(1.0, r2)
-  return Math.max(0.25, 1.0 - SCALE_FALLOFF * cape)
+  return Math.max(0.3, 1.0 - SCALE_FALLOFF * Math.min(1.0, r2))
 }
 
 const loadProjectTextures = async () => {
   const loader = new THREE.TextureLoader()
   const aspectMap = new Map<number, number>()
+  const loadPromises: Promise<void>[] = []
 
   for (let i = 0; i < PROJECT_COUNT; i++) {
     const url = PROJECTS[i].texture
-    try {
-      const tex = await new Promise<THREE.Texture>((resolve, reject) => {
-        loader.load(url, resolve, undefined, reject)
-      })
-      tex.colorSpace = THREE.SRGBColorSpace
-      tex.minFilter = THREE.LinearMipMapLinearFilter
-      tex.magFilter = THREE.LinearFilter
-      tex.generateMipmaps = true
-      tex.anisotropy = 4
-      tex.needsUpdate = true
-      textures.push(tex)
-      const img = (tex as THREE.Texture & { image?: HTMLImageElement }).image
-      if (img && img.width && img.height) {
-        aspectMap.set(i, img.width / img.height)
-      } else {
-        aspectMap.set(i, 1.0)
-      }
-    } catch {
-      textures.push(new THREE.Texture())
-      aspectMap.set(i, 1.0)
-    }
+    loadPromises.push(
+      (async () => {
+        try {
+          const tex = await loader.loadAsync(url)
+          tex.colorSpace = THREE.SRGBColorSpace
+          tex.minFilter = THREE.LinearMipMapLinearFilter
+          tex.magFilter = THREE.LinearFilter
+          tex.generateMipmaps = true
+          tex.anisotropy = 4
+          tex.needsUpdate = true
+          textures[i] = tex
+          const img = (tex as THREE.Texture & { image?: HTMLImageElement }).image
+          aspectMap.set(i, img && img.width && img.height ? img.width / img.height : 1.0)
+        } catch {
+          aspectMap.set(i, 1.0)
+        }
+      })()
+    )
   }
+
+  await Promise.all(loadPromises)
 
   for (let i = 0; i < CARD_COUNT; i++) {
     const projectIndex = i % PROJECT_COUNT
@@ -104,7 +102,15 @@ const loadProjectTextures = async () => {
       materials[i].uniforms.uTextureAspect.value = aspectMap.get(projectIndex) ?? 1.0
       materials[i].uniforms.uHasTexture.value = 1.0
       materials[i].needsUpdate = true
+    } else if (materials[i]) {
+      materials[i].uniforms.uHasTexture.value = 0.0
     }
+  }
+
+  texturesReady = true
+
+  for (let i = 0; i < CARD_COUNT; i++) {
+    materials[i].uniforms.uOpacity.value = 0.95
   }
 }
 
@@ -129,7 +135,7 @@ const buildCluster = () => {
         uResolution: { value: new THREE.Vector2(CARD_WIDTH, CARD_HEIGHT) },
         uColor: { value: new THREE.Color(project.color) },
         uRadius: { value: 0.08 },
-        uOpacity: { value: 0.95 },
+        uOpacity: { value: 0 },
         uStretch: { value: 0 },
         uTexture: { value: new THREE.Texture() },
         uTextureAspect: { value: 1.0 },
@@ -140,6 +146,7 @@ const buildCluster = () => {
     })
 
     const mesh = new THREE.Mesh(sharedGeometry, material)
+    mesh.visible = false
 
     const p = new THREE.Vector3()
     computeArcPoint(t, isUpper, p)
@@ -159,7 +166,9 @@ const buildCluster = () => {
     materials.push(material)
   }
 
-  loadProjectTextures()
+  loadProjectTextures().then(() => {
+    for (const mesh of meshes) mesh.visible = true
+  })
 
   renderCallback = (delta: number, elapsed: number) => {
     scrollStep(delta)
@@ -209,9 +218,13 @@ const buildCluster = () => {
       scratchTarget.lerp(scratchCamTarget, ROTATION_BLEND)
       mesh.lookAt(scratchTarget)
 
-      const dist = Math.abs(t)
-      const fade = THREE.MathUtils.clamp((limit - dist) / FADE_BAND, 0, 1)
-      material.uniforms.uOpacity.value = 0.95 * fade
+      if (texturesReady) {
+        const dist = Math.abs(t)
+        const fade = THREE.MathUtils.clamp((limit - dist) / FADE_BAND, 0, 1)
+        material.uniforms.uOpacity.value = 0.95 * fade
+      } else {
+        material.uniforms.uOpacity.value = 0
+      }
 
       const stretch = THREE.MathUtils.clamp(scroll.velocity * STRETCH_FACTOR, -2.0, 2.0)
       material.uniforms.uStretch.value = stretch
@@ -260,7 +273,7 @@ onBeforeUnmount(() => {
     material.dispose()
   }
   for (const tex of textures) {
-    tex.dispose()
+    if (tex) tex.dispose()
   }
   meshes.length = 0
   materials.length = 0
