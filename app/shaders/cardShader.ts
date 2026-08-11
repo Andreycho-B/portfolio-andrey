@@ -2,6 +2,7 @@ export const cardVertexShader = /* glsl */ `
   uniform float uCurvature;
   uniform float uTime;
   uniform vec2 uResolution;
+  uniform float uStretch;
 
   varying vec2 vUv;
   varying float vBend;
@@ -11,8 +12,10 @@ export const cardVertexShader = /* glsl */ `
 
     vec3 transformed = position;
     float bend = pow(uv.x - 0.5, 2.0) * uCurvature;
-    transformed.z -= bend;
-    vBend = bend;
+    float stretch = 1.0 + uStretch * 0.25;
+    transformed.z -= bend * stretch;
+    transformed.x *= stretch;
+    vBend = bend * stretch;
 
     gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
   }
