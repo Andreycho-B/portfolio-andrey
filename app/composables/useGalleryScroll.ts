@@ -7,6 +7,12 @@ export interface ScrollState {
   last: number
 }
 
+const WHEEL_SENS = 0.0028
+const TOUCH_SENS = 0.011
+const DRAG_SENS = 0.011
+const DRIFT_RATE = 0.0003
+const DRIFT_RESUME_DELAY = 1200
+
 export function useGalleryScroll() {
   const state: ScrollState = {
     target: 0,
@@ -18,15 +24,22 @@ export function useGalleryScroll() {
   let isDragging = false
   let lastPointerX = 0
   let lastTouchX = 0
+  let inputActiveUntil = 0
+
+  const markInputActive = () => {
+    inputActiveUntil = performance.now() + DRIFT_RESUME_DELAY
+  }
 
   const onWheel = (e: WheelEvent) => {
     e.preventDefault()
-    state.target += e.deltaY * 0.001 + e.deltaX * 0.001
+    state.target += e.deltaY * WHEEL_SENS + e.deltaX * WHEEL_SENS
+    markInputActive()
   }
 
   const onTouchStart = (e: TouchEvent) => {
     if (e.touches.length === 0) return
     lastTouchX = e.touches[0].clientX
+    markInputActive()
   }
 
   const onTouchMove = (e: TouchEvent) => {
@@ -35,27 +48,40 @@ export function useGalleryScroll() {
     const x = e.touches[0].clientX
     const dx = x - lastTouchX
     lastTouchX = x
-    state.target += dx * 0.004
+    state.target += dx * TOUCH_SENS
+    markInputActive()
   }
 
   const onPointerDown = (e: PointerEvent) => {
     if (e.pointerType !== 'mouse') return
     isDragging = true
     lastPointerX = e.clientX
+    markInputActive()
   }
 
   const onPointerMove = (e: PointerEvent) => {
     if (e.pointerType !== 'mouse' || !isDragging) return
     const dx = e.clientX - lastPointerX
     lastPointerX = e.clientX
-    state.target += dx * 0.004
+    state.target += dx * DRAG_SENS
+    markInputActive()
   }
 
   const onPointerUp = () => {
     isDragging = false
+    markInputActive()
   }
 
   const step = (delta: number) => {
+    if (delta <= 0) return
+
+    const now = performance.now()
+    const allowDrift = !isDragging && now >= inputActiveUntil
+
+    if (allowDrift) {
+      state.target += DRIFT_RATE * delta * 60
+    }
+
     state.current = THREE.MathUtils.damp(state.current, state.target, 8.0, delta)
     const moved = state.current - state.last
     state.velocity = delta > 0 ? moved / delta : 0

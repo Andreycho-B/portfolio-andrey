@@ -11,8 +11,11 @@ const CARD_WIDTH = 2.0
 const CARD_HEIGHT = 2.6
 const CARD_SEGMENTS = 32
 const SPACING = 4.0
-const ARC_DEPTH = 3.0
-const ARC_RADIUS = SPACING * 2.5
+const Y_OFFSET = 1.6
+const VERTICAL_CURVE = 0.008
+const ARC_DEPTH = 3.5
+const SPAN_CAPE = SPACING * 3.0
+const SCALE_FALLOFF = 0.45
 const MESH_CURVATURE = 0.8
 const STRETCH_FACTOR = 0.6
 const ROTATION_BLEND = 0.25
@@ -38,6 +41,7 @@ let sharedGeometry: THREE.PlaneGeometry | null = null
 let renderCallback: ((deltaTime: number, elapsedTime: number) => void) | null = null
 
 const cardOffsets: number[] = []
+const cardArcUpper: boolean[] = []
 const scratchP = new THREE.Vector3()
 const scratchAhead = new THREE.Vector3()
 const scratchTangent = new THREE.Vector3()
@@ -47,14 +51,21 @@ const scratchCamTarget = new THREE.Vector3()
 const { state: scroll, step: scrollStep, bind: bindScroll, unbind: unbindScroll } = useGalleryScroll()
 const { resume: resumeAudio, playClick } = useAudioClick()
 
-const computeArcPoint = (t: number, out: THREE.Vector3) => {
-  const r = t / ARC_RADIUS
-  const envelope = Math.max(0.0, 1.0 - r * r)
-  out.set(
-    t,
-    0.0,
-    -ARC_DEPTH * envelope,
-  )
+const computeArcPoint = (t: number, isUpper: boolean, out: THREE.Vector3) => {
+  const r = t / SPAN_CAPE
+  const r2 = r * r
+  const cape = Math.min(1.0, r2)
+  const y = isUpper
+    ? Y_OFFSET + VERTICAL_CURVE * t * t
+    : -(Y_OFFSET + VERTICAL_CURVE * t * t)
+  const z = -ARC_DEPTH * cape
+  out.set(t, y, z)
+}
+
+const computeScale = (t: number) => {
+  const r2 = (t / SPAN_CAPE) * (t / SPAN_CAPE)
+  const cape = Math.min(1.0, r2)
+  return Math.max(0.25, 1.0 - SCALE_FALLOFF * cape)
 }
 
 const loadProjectTextures = async () => {
@@ -103,6 +114,8 @@ const buildCluster = () => {
   for (let i = 0; i < CARD_COUNT; i++) {
     const t = (i + 0.5 - CARD_COUNT / 2) * SPACING
     cardOffsets.push(t)
+    const isUpper = i % 2 === 0
+    cardArcUpper.push(isUpper)
 
     const projectIndex = i % PROJECT_COUNT
     const project = PROJECTS[projectIndex]
@@ -129,13 +142,13 @@ const buildCluster = () => {
     const mesh = new THREE.Mesh(sharedGeometry, material)
 
     const p = new THREE.Vector3()
-    computeArcPoint(t, p)
+    computeArcPoint(t, isUpper, p)
     mesh.position.copy(p)
+    mesh.scale.setScalar(computeScale(t))
 
-    const tangent = new THREE.Vector3()
     const ahead = new THREE.Vector3()
-    computeArcPoint(t + 0.1, ahead)
-    tangent.subVectors(ahead, p).normalize()
+    computeArcPoint(t + 0.1, isUpper, ahead)
+    const tangent = new THREE.Vector3().subVectors(ahead, p).normalize()
     const target = new THREE.Vector3().addVectors(p, tangent)
     mesh.lookAt(target)
 
@@ -157,6 +170,7 @@ const buildCluster = () => {
     for (let i = 0; i < CARD_COUNT; i++) {
       const mesh = meshes[i]
       const material = materials[i]
+      const isUpper = cardArcUpper[i]
       material.uniforms.uTime.value = elapsed
 
       let t = cardOffsets[i] + scroll.current
@@ -184,10 +198,11 @@ const buildCluster = () => {
         }
       }
 
-      computeArcPoint(t, scratchP)
+      computeArcPoint(t, isUpper, scratchP)
       mesh.position.copy(scratchP)
+      mesh.scale.setScalar(computeScale(t))
 
-      computeArcPoint(t + 0.1, scratchAhead)
+      computeArcPoint(t + 0.1, isUpper, scratchAhead)
       scratchTangent.subVectors(scratchAhead, scratchP).normalize()
       scratchTarget.copy(scratchP).add(scratchTangent)
       scratchCamTarget.set(0, 0, camZ)
