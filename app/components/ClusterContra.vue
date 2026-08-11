@@ -46,7 +46,7 @@ const scratchTangent = new THREE.Vector3()
 const scratchTarget = new THREE.Vector3()
 const scratchCamTarget = new THREE.Vector3()
 
-const { state: scroll, bind: bindScroll, unbind: unbindScroll } = useGalleryScroll()
+const { state: scroll, step: scrollStep, bind: bindScroll, unbind: unbindScroll } = useGalleryScroll()
 const { resume: resumeAudio, playClick } = useAudioClick()
 
 const computeArcPoint = (t: number, out: THREE.Vector3) => {
@@ -104,7 +104,7 @@ const buildCluster = () => {
   }
 
   renderCallback = (delta: number, elapsed: number) => {
-    scroll.step(delta)
+    scrollStep(delta)
     const camZ = props.ctx.camera.position.z
 
     for (let i = 0; i < CARD_COUNT; i++) {

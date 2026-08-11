@@ -1,3 +1,5 @@
+import * as THREE from 'three'
+
 export interface ScrollState {
   target: number
   current: number
@@ -82,5 +84,5 @@ export function useGalleryScroll() {
     window.removeEventListener('pointercancel', onPointerUp)
   }
 
-  return { state, bind, unbind }
+  return { state, step, bind, unbind }
 }
