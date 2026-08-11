@@ -3,4 +3,13 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
 
   modules: ['nuxt-security'],
+
+  vite: {
+    optimizeDeps: {
+      include: ['three'],
+    },
+    ssr: {
+      noExternal: ['three'],
+    },
+  },
 })
