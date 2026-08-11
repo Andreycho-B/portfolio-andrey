@@ -10,22 +10,19 @@ const PROJECT_COUNT = 4
 const CARD_WIDTH = 2.0
 const CARD_HEIGHT = 2.6
 const CARD_SEGMENTS = 32
-const SPACING = 3.0
+const SPACING = 4.0
 const ARC_DEPTH = 3.0
-const ARC_AMPLITUDE = 1.2
-const ARC_FREQUENCY = 0.28
+const ARC_RADIUS = SPACING * 2.5
 const MESH_CURVATURE = 0.8
-const SPAN = (CARD_COUNT - 1) * SPACING
-const SCROLL_SCALE = 1.0
 const STRETCH_FACTOR = 0.6
-const ROTATION_BLEND = 0.7
+const ROTATION_BLEND = 0.25
 const FADE_BAND = SPACING
 
 const PROJECTS = [
-  { color: 0x1B2A5E },
-  { color: 0xE89A3F },
-  { color: 0xB83A2A },
-  { color: 0x2747A8 },
+  { color: 0x1B2A5E, texture: '/images/projects/project-0.webp' },
+  { color: 0xE89A3F, texture: '/images/projects/project-1.webp' },
+  { color: 0xB83A2A, texture: '/images/projects/project-2.webp' },
+  { color: 0x2747A8, texture: '/images/projects/project-3.webp' },
 ]
 
 interface Props {
@@ -36,6 +33,7 @@ const props = defineProps<Props>()
 
 const meshes: THREE.Mesh[] = []
 const materials: THREE.ShaderMaterial[] = []
+const textures: THREE.Texture[] = []
 let sharedGeometry: THREE.PlaneGeometry | null = null
 let renderCallback: ((deltaTime: number, elapsedTime: number) => void) | null = null
 
@@ -50,18 +48,60 @@ const { state: scroll, step: scrollStep, bind: bindScroll, unbind: unbindScroll 
 const { resume: resumeAudio, playClick } = useAudioClick()
 
 const computeArcPoint = (t: number, out: THREE.Vector3) => {
+  const r = t / ARC_RADIUS
+  const envelope = Math.max(0.0, 1.0 - r * r)
   out.set(
     t,
-    Math.sin(t * ARC_FREQUENCY) * ARC_AMPLITUDE,
-    -((t * t) / SPAN) * ARC_DEPTH,
+    0.0,
+    -ARC_DEPTH * envelope,
   )
+}
+
+const loadProjectTextures = async () => {
+  const loader = new THREE.TextureLoader()
+  const aspectMap = new Map<number, number>()
+
+  for (let i = 0; i < PROJECT_COUNT; i++) {
+    const url = PROJECTS[i].texture
+    try {
+      const tex = await new Promise<THREE.Texture>((resolve, reject) => {
+        loader.load(url, resolve, undefined, reject)
+      })
+      tex.colorSpace = THREE.SRGBColorSpace
+      tex.minFilter = THREE.LinearMipMapLinearFilter
+      tex.magFilter = THREE.LinearFilter
+      tex.generateMipmaps = true
+      tex.anisotropy = 4
+      tex.needsUpdate = true
+      textures.push(tex)
+      const img = (tex as THREE.Texture & { image?: HTMLImageElement }).image
+      if (img && img.width && img.height) {
+        aspectMap.set(i, img.width / img.height)
+      } else {
+        aspectMap.set(i, 1.0)
+      }
+    } catch {
+      textures.push(new THREE.Texture())
+      aspectMap.set(i, 1.0)
+    }
+  }
+
+  for (let i = 0; i < CARD_COUNT; i++) {
+    const projectIndex = i % PROJECT_COUNT
+    if (materials[i] && textures[projectIndex]) {
+      materials[i].uniforms.uTexture.value = textures[projectIndex]
+      materials[i].uniforms.uTextureAspect.value = aspectMap.get(projectIndex) ?? 1.0
+      materials[i].uniforms.uHasTexture.value = 1.0
+      materials[i].needsUpdate = true
+    }
+  }
 }
 
 const buildCluster = () => {
   sharedGeometry = new THREE.PlaneGeometry(CARD_WIDTH, CARD_HEIGHT, CARD_SEGMENTS, CARD_SEGMENTS)
 
   for (let i = 0; i < CARD_COUNT; i++) {
-    const t = (i - (CARD_COUNT - 1) / 2) * SPACING
+    const t = (i + 0.5 - CARD_COUNT / 2) * SPACING
     cardOffsets.push(t)
 
     const projectIndex = i % PROJECT_COUNT
@@ -78,6 +118,9 @@ const buildCluster = () => {
         uRadius: { value: 0.08 },
         uOpacity: { value: 0.95 },
         uStretch: { value: 0 },
+        uTexture: { value: new THREE.Texture() },
+        uTextureAspect: { value: 1.0 },
+        uHasTexture: { value: 0.0 },
       },
       transparent: true,
       side: THREE.DoubleSide,
@@ -103,33 +146,42 @@ const buildCluster = () => {
     materials.push(material)
   }
 
+  loadProjectTextures()
+
   renderCallback = (delta: number, elapsed: number) => {
     scrollStep(delta)
     const camZ = props.ctx.camera.position.z
+    const span = (CARD_COUNT - 1) * SPACING
+    const limit = span / 2 + SPACING * 1.5
 
     for (let i = 0; i < CARD_COUNT; i++) {
       const mesh = meshes[i]
       const material = materials[i]
       material.uniforms.uTime.value = elapsed
 
-      let t = cardOffsets[i] + scroll.current * SCROLL_SCALE
-      const limit = SPAN / 2 + SPACING * 1.5
+      let t = cardOffsets[i] + scroll.current
 
       while (t > limit) {
-        t -= SPAN + SPACING * 2
-        cardOffsets[i] -= SPAN + SPACING * 2
-        const idx = Math.round(cardOffsets[i] / SPACING) % PROJECT_COUNT
-        const safeIdx = idx < 0 ? idx + PROJECT_COUNT : idx
-        mesh.userData.projectIndex = safeIdx
-        material.uniforms.uColor.value = new THREE.Color(PROJECTS[safeIdx].color)
+        t -= span + SPACING * 2
+        cardOffsets[i] -= span + SPACING * 2
+        const idx = ((Math.round(cardOffsets[i] / SPACING) % PROJECT_COUNT) + PROJECT_COUNT) % PROJECT_COUNT
+        mesh.userData.projectIndex = idx
+        material.uniforms.uColor.value = new THREE.Color(PROJECTS[idx].color)
+        if (textures[idx]) {
+          material.uniforms.uTexture.value = textures[idx]
+          material.uniforms.uHasTexture.value = 1.0
+        }
       }
       while (t < -limit) {
-        t += SPAN + SPACING * 2
-        cardOffsets[i] += SPAN + SPACING * 2
-        const idx = Math.round(cardOffsets[i] / SPACING) % PROJECT_COUNT
-        const safeIdx = idx < 0 ? idx + PROJECT_COUNT : idx
-        mesh.userData.projectIndex = safeIdx
-        material.uniforms.uColor.value = new THREE.Color(PROJECTS[safeIdx].color)
+        t += span + SPACING * 2
+        cardOffsets[i] += span + SPACING * 2
+        const idx = ((Math.round(cardOffsets[i] / SPACING) % PROJECT_COUNT) + PROJECT_COUNT) % PROJECT_COUNT
+        mesh.userData.projectIndex = idx
+        material.uniforms.uColor.value = new THREE.Color(PROJECTS[idx].color)
+        if (textures[idx]) {
+          material.uniforms.uTexture.value = textures[idx]
+          material.uniforms.uHasTexture.value = 1.0
+        }
       }
 
       computeArcPoint(t, scratchP)
@@ -192,9 +244,13 @@ onBeforeUnmount(() => {
   for (const material of materials) {
     material.dispose()
   }
-  sharedGeometry?.dispose()
+  for (const tex of textures) {
+    tex.dispose()
+  }
   meshes.length = 0
   materials.length = 0
+  textures.length = 0
+  sharedGeometry?.dispose()
   sharedGeometry = null
 })
 </script>

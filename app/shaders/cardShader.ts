@@ -26,6 +26,10 @@ export const cardFragmentShader = /* glsl */ `
   uniform vec3 uColor;
   uniform float uRadius;
   uniform float uOpacity;
+  uniform sampler2D uTexture;
+  uniform vec2 uResolution;
+  uniform float uTextureAspect;
+  uniform float uHasTexture;
 
   varying vec2 vUv;
   varying float vBend;
@@ -45,6 +49,23 @@ export const cardFragmentShader = /* glsl */ `
     float alpha = 1.0 - smoothstep(-aa, aa, dist);
 
     vec3 color = uColor;
+
+    if (uHasTexture > 0.5) {
+      float cardAspect = uResolution.x / uResolution.y;
+      float texAspect = uTextureAspect;
+
+      vec2 scale = vec2(1.0);
+      if (texAspect > cardAspect) {
+        scale.x = cardAspect / texAspect;
+      } else {
+        scale.y = texAspect / cardAspect;
+      }
+
+      vec2 coverUv = vec2(0.5) + (vUv - 0.5) * scale;
+      vec4 texColor = texture2D(uTexture, coverUv);
+      color = mix(color, texColor.rgb, 0.92);
+    }
+
     float lighting = 1.0 - abs(vBend) * 0.5;
     color *= lighting;
 
