@@ -40,3 +40,14 @@ Thumbs.db
 # Test and coverage
 coverage
 *.test.log
+
+# Local references (capturas, mood board, notas locales)
+referencias/
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Local dev screenshots
+pacome-*.png
+f4-d*-screenshot.png
+*-local-screenshot.png
