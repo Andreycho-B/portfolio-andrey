@@ -66,11 +66,12 @@ const handleWebGLUnsupported = () => {
 
 .portfolio-text {
   font-family: 'Playfair Display', Georgia, serif;
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  color: #6b7280;
-  letter-spacing: -0.01em;
+  color: #9ca3af;
+  letter-spacing: 0.05em;
   margin: 0;
+  text-transform: lowercase;
 }
 
 .fallback {

@@ -63,11 +63,27 @@ export const cardFragmentShader = /* glsl */ `
 
       vec2 coverUv = vec2(0.5) + (vUv - 0.5) * scale;
       vec4 texColor = texture2D(uTexture, coverUv);
-      color = mix(color, texColor.rgb, 0.92);
+
+      // Saturation boost (1.4x)
+      vec3 luminance = vec3(dot(texColor.rgb, vec3(0.299, 0.587, 0.114)));
+      texColor.rgb = luminance + 1.4 * (texColor.rgb - luminance);
+
+      // Contrast boost
+      texColor.rgb = (texColor.rgb - 0.5) * 1.15 + 0.5;
+
+      // Clamp to valid range
+      texColor.rgb = clamp(texColor.rgb, 0.0, 1.0);
+
+      color = mix(color, texColor.rgb, 0.95);
     }
 
-    float lighting = 1.0 - abs(vBend) * 0.5;
+    float lighting = 1.0 - abs(vBend) * 0.35;
     color *= lighting;
+
+    // Subtle vignette on card edges
+    float edgeFade = smoothstep(0.0, 0.08, vUv.x) * smoothstep(0.0, 0.08, 1.0 - vUv.x)
+                   * smoothstep(0.0, 0.08, vUv.y) * smoothstep(0.0, 0.08, 1.0 - vUv.y);
+    color *= mix(0.85, 1.0, edgeFade);
 
     gl_FragColor = vec4(color, alpha * uOpacity);
   }

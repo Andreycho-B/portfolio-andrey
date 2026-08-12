@@ -5,21 +5,21 @@ import { useGalleryScroll } from '~/composables/useGalleryScroll'
 import { useAudioClick } from '~/composables/useAudioClick'
 import type { SceneContext } from '~/components/WebGLScene.vue'
 
-const CARD_COUNT = 8
+const CARD_COUNT = 10
 const PROJECT_COUNT = 4
-const CARD_WIDTH = 2.0
-const CARD_HEIGHT = 2.6
-const CARD_SEGMENTS = 32
-const SPACING = 1.8
-const Y_OFFSET = 0.9
-const VERTICAL_CURVE = 0.04
-const Z_POW = 1.2
-const Z_COEFF = 0.4
-const SCALE_FALLOFF_PER_UNIT = 0.12
-const SCALE_MIN = 0.4
-const MESH_CURVATURE = 0.8
-const STRETCH_FACTOR = 0.6
-const ROTATION_BLEND = 0.25
+const CARD_WIDTH = 1.3
+const CARD_HEIGHT = 1.0
+const CARD_SEGMENTS = 16
+const SPACING = 2.2
+const Y_OFFSET = 1.5
+const VERTICAL_CURVE = 0.012
+const Z_POW = 1.0
+const Z_COEFF = 0.25
+const SCALE_FALLOFF_PER_UNIT = 0.045
+const SCALE_MIN = 0.55
+const MESH_CURVATURE = 0.5
+const STRETCH_FACTOR = 0.35
+const ROTATION_BLEND = 0.2
 const FADE_BAND = SPACING
 
 const PROJECTS = [
@@ -134,7 +134,7 @@ const buildCluster = () => {
         uTime: { value: 0 },
         uResolution: { value: new THREE.Vector2(CARD_WIDTH, CARD_HEIGHT) },
         uColor: { value: new THREE.Color(project.color) },
-        uRadius: { value: 0.08 },
+        uRadius: { value: 0.15 },
         uOpacity: { value: 0 },
         uStretch: { value: 0 },
         uTexture: { value: new THREE.Texture() },

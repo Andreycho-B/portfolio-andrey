@@ -7,9 +7,9 @@ export interface ScrollState {
   last: number
 }
 
-const WHEEL_SENS = 0.035
-const TOUCH_SENS = 0.025
-const DRAG_SENS = 0.025
+const WHEEL_SENS = 0.045
+const TOUCH_SENS = 0.035
+const DRAG_SENS = 0.035
 const DRIFT_RATE = 0.0008
 const DRIFT_RESUME_DELAY = 600
 
