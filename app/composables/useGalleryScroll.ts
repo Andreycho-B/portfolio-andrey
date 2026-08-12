@@ -10,8 +10,8 @@ export interface ScrollState {
 const WHEEL_SENS = 0.035
 const TOUCH_SENS = 0.025
 const DRAG_SENS = 0.025
-const DRIFT_RATE = 0.0003
-const DRIFT_RESUME_DELAY = 1200
+const DRIFT_RATE = 0.0008
+const DRIFT_RESUME_DELAY = 600
 
 export function useGalleryScroll() {
   const state: ScrollState = {
@@ -25,6 +25,11 @@ export function useGalleryScroll() {
   let lastPointerX = 0
   let lastTouchX = 0
   let inputActiveUntil = 0
+  let driftDirection = 1
+
+  const recordImpulse = (amount: number) => {
+    if (Math.abs(amount) > 1e-7) driftDirection = amount >= 0 ? 1 : -1
+  }
 
   const markInputActive = () => {
     inputActiveUntil = performance.now() + DRIFT_RESUME_DELAY
@@ -32,7 +37,9 @@ export function useGalleryScroll() {
 
   const onWheel = (e: WheelEvent) => {
     e.preventDefault()
-    state.target += e.deltaY * WHEEL_SENS
+    const amount = e.deltaY * WHEEL_SENS
+    state.target += amount
+    recordImpulse(amount)
     markInputActive()
   }
 
@@ -48,7 +55,9 @@ export function useGalleryScroll() {
     const x = e.touches[0].clientX
     const dx = x - lastTouchX
     lastTouchX = x
-    state.target += dx * TOUCH_SENS
+    const amount = dx * TOUCH_SENS
+    state.target += amount
+    recordImpulse(amount)
     markInputActive()
   }
 
@@ -63,7 +72,9 @@ export function useGalleryScroll() {
     if (e.pointerType !== 'mouse' || !isDragging) return
     const dx = e.clientX - lastPointerX
     lastPointerX = e.clientX
-    state.target += dx * DRAG_SENS
+    const amount = dx * DRAG_SENS
+    state.target += amount
+    recordImpulse(amount)
     markInputActive()
   }
 
@@ -79,7 +90,7 @@ export function useGalleryScroll() {
     const allowDrift = !isDragging && now >= inputActiveUntil
 
     if (allowDrift) {
-      state.target += DRIFT_RATE * delta * 60
+      state.target += DRIFT_RATE * driftDirection * delta * 60
     }
 
     state.current = THREE.MathUtils.damp(state.current, state.target, 8.0, delta)

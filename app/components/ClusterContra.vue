@@ -10,12 +10,13 @@ const PROJECT_COUNT = 4
 const CARD_WIDTH = 2.0
 const CARD_HEIGHT = 2.6
 const CARD_SEGMENTS = 32
-const SPACING = 3.5
-const Y_OFFSET = 2.2
-const VERTICAL_CURVE = 0.08
-const ARC_DEPTH = 3.0
-const SCALE_FALLOFF = 0.45
-const SPAN_CAPE = SPACING * 3.0
+const SPACING = 1.8
+const Y_OFFSET = 0.9
+const VERTICAL_CURVE = 0.04
+const Z_POW = 1.2
+const Z_COEFF = 0.4
+const SCALE_FALLOFF_PER_UNIT = 0.12
+const SCALE_MIN = 0.4
 const MESH_CURVATURE = 0.8
 const STRETCH_FACTOR = 0.6
 const ROTATION_BLEND = 0.25
@@ -57,13 +58,12 @@ const computeArcPoint = (t: number, isUpper: boolean, out: THREE.Vector3) => {
   const yBase = isUpper ? Y_OFFSET : -Y_OFFSET
   const yParabola = t * t * VERTICAL_CURVE
   const y = isUpper ? yBase + yParabola : yBase - yParabola
-  const z = -ARC_DEPTH * Math.min(1.0, (t / SPAN_CAPE) * (t / SPAN_CAPE))
+  const z = -Math.pow(Math.abs(t), Z_POW) * Z_COEFF
   out.set(x, y, z)
 }
 
 const computeScale = (t: number) => {
-  const r2 = (t / SPAN_CAPE) * (t / SPAN_CAPE)
-  return Math.max(0.3, 1.0 - SCALE_FALLOFF * Math.min(1.0, r2))
+  return Math.max(SCALE_MIN, 1.0 - Math.abs(t) * SCALE_FALLOFF_PER_UNIT)
 }
 
 const loadProjectTextures = async () => {
