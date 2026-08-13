@@ -101,13 +101,13 @@ const setupScene = () => {
   })
 
   const animate = () => {
-    animationId = requestAnimationFrame(animate)
     if (!timer || !renderer || !scene || !camera) return
     timer.update()
     const delta = Math.min(timer.getDelta(), 0.05)
     const elapsed = timer.getElapsed()
     for (const cb of renderCallbacks) cb(delta, elapsed)
     renderer.render(scene, camera)
+    animationId = requestAnimationFrame(animate)
   }
   animate()
 
