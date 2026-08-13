@@ -1,8 +1,26 @@
 <script setup lang="ts">
-import '@fontsource-variable/space-grotesk'
 import WebGLScene from '~/components/WebGLScene.vue'
 import ClusterContra from '~/components/ClusterContra.vue'
 import type { SceneContext } from '~/components/WebGLScene.vue'
+
+useHead({
+  link: [
+    {
+      rel: 'preload',
+      href: '/fonts/space-grotesk-variable.woff2',
+      as: 'font',
+      type: 'font/woff2',
+      crossorigin: '',
+    },
+    {
+      rel: 'preload',
+      href: '/fonts/LeMurmure-Regular.woff2',
+      as: 'font',
+      type: 'font/woff2',
+      crossorigin: '',
+    },
+  ],
+})
 
 const webglSupported = ref(true)
 const sceneCtx = ref<SceneContext | null>(null)
@@ -105,11 +123,19 @@ const handleWebGLUnsupported = () => {
 
 <style scoped>
 @font-face {
+  font-family: 'Space Grotesk Variable';
+  src: url('/fonts/space-grotesk-variable.woff2') format('woff2');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
   font-family: 'Le Murmure';
   src: url('/fonts/LeMurmure-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
-  font-display: swap;
+  font-display: block;
 }
 
 .page {
@@ -268,5 +294,33 @@ const handleWebGLUnsupported = () => {
   justify-content: center;
   width: 100%;
   height: 100%;
+}
+
+@media (max-width: 640px) {
+  .overlay {
+    padding-right: 6%;
+  }
+
+  .portfolio-text {
+    font-size: 1.15rem;
+  }
+
+  .word-main {
+    font-size: 1.7rem;
+  }
+
+  .project-list {
+    gap: 1.9rem;
+  }
+
+  .project-list li {
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
+  .project-list li:hover {
+    letter-spacing: 0.14em;
+  }
 }
 </style>
