@@ -1,9 +1,22 @@
 export const cardVertexShader = /* glsl */ `
   varying vec2 vUv;
+  varying float vWorldX;
 
   void main() {
     vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec3 pos = position;
+
+    // Doblado cilíndrico local sutil en la tarjeta
+    pos.z -= pow(pos.x, 2.0) * 0.08;
+
+    vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
+    vWorldX = worldPosition.x;
+
+    // Profundidad continua Z: se hunden hacia el fondo a la derecha sin colisionar
+    float normX = clamp((worldPosition.x + 3.5) / 7.0, 0.0, 1.0);
+    worldPosition.z -= pow(normX, 1.5) * 0.8;
+
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
   }
 `
 
@@ -15,8 +28,10 @@ export const cardFragmentShader = /* glsl */ `
   uniform vec2 uResolution;
   uniform float uTextureAspect;
   uniform float uHasTexture;
+  uniform vec4 uFadeEdges;
 
   varying vec2 vUv;
+  varying float vWorldX;
 
   float roundedBoxSDF(vec2 p, vec2 b, float r) {
     vec2 q = abs(p) - b + r;
@@ -32,6 +47,12 @@ export const cardFragmentShader = /* glsl */ `
     float aa = fwidth(dist) * 1.5;
     float alpha = 1.0 - smoothstep(-aa, aa, dist);
 
+    // Fade horizontal de bordes: las tarjetas se disuelven al entrar/salir del viewport
+    float edgeFade = 1.0;
+    edgeFade *= smoothstep(uFadeEdges.x, uFadeEdges.y, vWorldX);
+    edgeFade *= 1.0 - smoothstep(uFadeEdges.z, uFadeEdges.w, vWorldX);
+    alpha *= edgeFade;
+
     vec3 color = uColor;
 
     if (uHasTexture > 0.5) {
@@ -46,6 +67,7 @@ export const cardFragmentShader = /* glsl */ `
       }
 
       vec2 coverUv = vec2(0.5) + (vUv - 0.5) * scale;
+
       vec4 texColor = texture2D(uTexture, coverUv);
 
       // Saturation boost (1.4x)

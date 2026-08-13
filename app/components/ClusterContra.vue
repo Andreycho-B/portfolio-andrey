@@ -4,11 +4,24 @@ import { cardVertexShader, cardFragmentShader } from '~/shaders/cardShader'
 import type { SceneContext } from '~/components/WebGLScene.vue'
 
 const CARD_SIZE = 0.85
-const CARD_SEGMENTS = 1
+const CARD_SEGMENTS = 16
 const SPACING = 0.95
 const ROW_Y = 0.95
 const ROW_Z = 0
 const CORNER_RADIUS_PX = 12
+const TOP_AMP = 0.676
+const TOP_PEAK = 0.33
+const TOP_WIDTH = 0.39
+const FADE_EDGE_IN = 0.9
+const FADE_EDGE_OUT = 1.0
+
+const INTRO_FUGA = new THREE.Vector3(9.6, 0.35, -10.5)
+const INTRO_DURATION = 1.8
+const INTRO_MAX_DELAY = 0.35
+const INTRO_BACK = 1.2
+const INTRO_ROT = 0.16
+
+const fadeEdges = new THREE.Vector4()
 
 const BASE_DRIFT = 0.15
 const WHEEL_SENSITIVITY = 0.012
@@ -33,7 +46,7 @@ const CARDS_PER_ROW = 16
 const ROW_COUNT = 2
 const CARD_COUNT = CARDS_PER_ROW * ROW_COUNT
 const ROW_WIDTH = CARDS_PER_ROW * SPACING
-const ROW_DIRS = [1, -1]
+const ROW_DIRS = [-1, -1]
 
 interface Props {
   ctx: SceneContext
@@ -47,8 +60,15 @@ const meshes: THREE.Mesh[] = []
 const materials: THREE.ShaderMaterial[] = []
 const baseX: number[] = []
 const rowIndexes: number[] = []
+const introDelays: number[] = []
+const introRots: number[] = []
+
+let sharedGeometry: THREE.PlaneGeometry | null = null
+let introPlayed = false
 
 let renderCallback: ((deltaTime: number, elapsedTime: number) => void) | null = null
+
+let disposed = false
 
 let wheelVel = 0
 let smoothVel = 0
@@ -57,7 +77,8 @@ let lastTouchY: number | null = null
 const rowOffsets = [0, 0]
 
 const onWheel = (e: WheelEvent) => {
-  wheelVel += e.deltaY * WHEEL_SENSITIVITY
+  const delta = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 16 : e.deltaY
+  wheelVel += delta * WHEEL_SENSITIVITY
 }
 
 const onTouchStart = (e: TouchEvent) => {
@@ -77,18 +98,21 @@ const onTouchEnd = () => {
   lastTouchY = null
 }
 
-const applyCornerRadius = (viewportHeight: number) => {
+const applyCornerRadius = (viewportWidth: number, viewportHeight: number) => {
   const cam = props.ctx.camera
   const dist = cam.position.z - ROW_Z
   const projectedSize = (CARD_SIZE / dist) * (viewportHeight / (2 * Math.tan((cam.fov * Math.PI) / 360)))
   const radius = Math.min(CORNER_RADIUS_PX / projectedSize, 0.5)
+  const halfW = cam.position.z * Math.tan((cam.fov * Math.PI) / 360) * (viewportWidth / viewportHeight)
+  fadeEdges.set(-halfW * FADE_EDGE_OUT, -halfW * FADE_EDGE_IN, halfW * FADE_EDGE_IN, halfW * FADE_EDGE_OUT)
   for (const material of materials) {
     material.uniforms.uRadius!.value = radius
+    material.uniforms.uFadeEdges!.value.copy(fadeEdges)
   }
 }
 
-const onResize = (_width: number, height: number) => {
-  applyCornerRadius(height)
+const onResize = (width: number, height: number) => {
+  applyCornerRadius(width, height)
 }
 
 const loadTexture = async (url: string) => {
@@ -111,7 +135,14 @@ const loadTexture = async (url: string) => {
 
 const buildRows = async () => {
   const geometry = new THREE.PlaneGeometry(CARD_SIZE, CARD_SIZE, CARD_SEGMENTS, CARD_SEGMENTS)
+  sharedGeometry = geometry
+  const introEnabled = !introPlayed
+  introPlayed = true
   const texInfos = await Promise.all(PROJECTS.map(loadTexture))
+  if (disposed) {
+    for (const info of texInfos) info?.tex.dispose()
+    return
+  }
 
   for (let pi = 0; pi < PROJECTS.length; pi++) {
     const material = new THREE.ShaderMaterial({
@@ -125,6 +156,7 @@ const buildRows = async () => {
         uTexture: { value: new THREE.Texture() },
         uTextureAspect: { value: 1.0 },
         uHasTexture: { value: 0.0 },
+        uFadeEdges: { value: fadeEdges.clone() },
       },
       transparent: true,
     })
@@ -138,7 +170,7 @@ const buildRows = async () => {
     materials.push(material)
   }
 
-  applyCornerRadius(window.innerHeight)
+  applyCornerRadius(window.innerWidth, window.innerHeight)
   props.ctx.registerResizeCallback(onResize)
 
   for (let i = 0; i < CARD_COUNT; i++) {
@@ -149,15 +181,27 @@ const buildRows = async () => {
     mesh.visible = false
     props.ctx.scene.add(mesh)
     meshes.push(mesh)
-    baseX.push(col * SPACING - ROW_WIDTH / 2)
+    const bx = col * SPACING - ROW_WIDTH / 2
+    baseX.push(bx)
+    introDelays.push(Math.min(Math.max((ROW_WIDTH / 2 - bx) / ROW_WIDTH, 0), 1) * INTRO_MAX_DELAY)
+    introRots.push((((i * 37) % 11) / 11 - 0.5) * INTRO_ROT)
     rowIndexes.push(row)
   }
 
   let fadeStart: number | null = null
   let fadeOutStart: number | null = null
   let fadeCompleteSent = false
+  let introElapsed = 0
+  let introEnded = false
 
   renderCallback = (deltaTime: number, elapsedTime: number) => {
+    if (introEnabled) introElapsed += deltaTime
+    const introActive = introEnabled && introElapsed < INTRO_DURATION + INTRO_MAX_DELAY
+    if (!introActive && !introEnded) {
+      introEnded = true
+      wheelVel = 0
+      smoothVel = 0
+    }
     wheelVel *= Math.exp(-WHEEL_DECAY_RATE * deltaTime)
     smoothVel += (wheelVel - smoothVel) * (1 - Math.exp(-SMOOTH_RATE * deltaTime))
 
@@ -167,15 +211,56 @@ const buildRows = async () => {
     const factor = 1 + Math.max(0, smoothVel * WHEEL_FACTOR * driftDir)
 
     for (let r = 0; r < ROW_COUNT; r++) {
+      if (introActive) continue
       rowOffsets[r]! += BASE_DRIFT * ROW_DIRS[r]! * driftDir * factor * deltaTime
       if (rowOffsets[r]! > ROW_WIDTH) rowOffsets[r]! -= ROW_WIDTH
       if (rowOffsets[r]! < -ROW_WIDTH) rowOffsets[r]! += ROW_WIDTH
     }
 
+    const c1 = INTRO_BACK + 1
+    const c3 = c1 + 1
+
     for (let i = 0; i < CARD_COUNT; i++) {
+      const m = meshes[i]!
       const r = rowIndexes[i]!
       const trackX = (((baseX[i]! + rowOffsets[r]!) % ROW_WIDTH) + ROW_WIDTH) % ROW_WIDTH
-      meshes[i]!.position.x = trackX - ROW_WIDTH / 2
+      const xPos = trackX - ROW_WIDTH / 2
+
+      const halfWidth = ROW_WIDTH / 2
+      const t = Math.min(Math.max((xPos + halfWidth) / ROW_WIDTH, 0.0), 1.0)
+
+      const isTop = r === 0
+      const sign = isTop ? 1.0 : -1.0
+
+      m.position.x = xPos
+
+      const tu = (t - TOP_PEAK) / TOP_WIDTH
+
+      const inBump = tu > -1.0 && tu < 1.0
+
+      const spread = inBump ? TOP_AMP * 0.5 * (1.0 + Math.cos(Math.PI * tu)) : 0
+      m.position.y = sign * (0.7 + spread)
+
+      m.position.z = 0
+
+      m.rotation.x = 0
+      m.rotation.y = 0
+      const slope = inBump
+        ? -((TOP_AMP * Math.PI) / (2 * TOP_WIDTH * ROW_WIDTH)) * Math.sin(Math.PI * tu)
+        : 0
+      m.rotation.z = isTop ? slope : -slope
+
+      if (introActive) {
+        const introT = Math.min(Math.max((introElapsed - introDelays[i]!) / INTRO_DURATION, 0), 1)
+        if (introT < 1) {
+          const e = 1 - Math.pow(1 - introT, 5)
+          const ey = 1 + c3 * Math.pow(introT - 1, 3) + c1 * Math.pow(introT - 1, 2)
+          m.position.x = INTRO_FUGA.x + (m.position.x - INTRO_FUGA.x) * e
+          m.position.y = INTRO_FUGA.y + (m.position.y - INTRO_FUGA.y) * ey
+          m.position.z = INTRO_FUGA.z + (m.position.z - INTRO_FUGA.z) * e
+          m.rotation.z += introRots[i]! * (1 - e)
+        }
+      }
     }
 
     let opacity: number
@@ -211,6 +296,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  disposed = true
   window.removeEventListener('wheel', onWheel)
   window.removeEventListener('touchstart', onTouchStart)
   window.removeEventListener('touchmove', onTouchMove)
@@ -228,11 +314,16 @@ onBeforeUnmount(() => {
   }
   for (const material of materials) {
     material.uniforms.uTexture!.value.dispose()
+    material.dispose()
   }
+  sharedGeometry?.dispose()
+  sharedGeometry = null
   meshes.length = 0
   materials.length = 0
   baseX.length = 0
   rowIndexes.length = 0
+  introDelays.length = 0
+  introRots.length = 0
 })
 </script>
 
