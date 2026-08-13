@@ -19,7 +19,7 @@ const SMOOTH_RATE = 6
 const FLIP_THRESHOLD = 0.4
 
 const FADE_DURATION = 0.6
-const FADE_OUT_DURATION = 0.45
+const FADE_OUT_DURATION = 0.6
 const FINAL_OPACITY = 0.95
 
 const PROJECTS = [
