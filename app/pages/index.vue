@@ -87,7 +87,7 @@ const handleWebGLUnsupported = () => {
       <div class="overlay">
         <h1
           class="portfolio-text"
-          :class="{ 'font-ready': fontReady }"
+          :class="{ 'font-ready': fontReady, vertical: mode === 'lista' }"
         >
           <span
             class="word-sub"
@@ -303,6 +303,14 @@ const handleWebGLUnsupported = () => {
 
   .portfolio-text {
     font-size: 1.15rem;
+  }
+
+  .portfolio-text.vertical {
+    flex-direction: column;
+  }
+
+  .portfolio-text.vertical .star {
+    margin: 0.35em 0;
   }
 
   .word-main {
