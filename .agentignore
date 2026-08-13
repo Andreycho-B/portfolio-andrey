@@ -70,3 +70,6 @@ conversation_*.txt
 14_KNOWN_PROBLEMS.md
 15_OPEN_QUESTIONS.md
 16_ARCHITECTURE_DECISIONS.md
+
+# Onboarding del agente (AGENTS.md) — no versionado (GIT-001)
+AGENTS.md

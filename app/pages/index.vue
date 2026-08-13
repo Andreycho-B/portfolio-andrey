@@ -48,7 +48,8 @@ const flipSnapshot = () => {
 }
 
 const openList = () => {
-  if (mode.value === 'lista') return
+  if (mode.value === 'lista' || listLeaving.value) return
+  clearTimeout(listTimeout)
   const last = flipSnapshot()
   mode.value = 'lista'
   marqueeFading.value = true
@@ -57,9 +58,11 @@ const openList = () => {
 
 const closeList = () => {
   if (listLeaving.value) return
+  clearTimeout(listTimeout)
   const last = flipSnapshot()
   listLeaving.value = true
-  setTimeout(() => {
+  if (marqueeFading.value) marqueeFading.value = false
+  listTimeout = setTimeout(() => {
     mode.value = 'carrusel'
     marqueeFading.value = false
     marqueeVisible.value = true
@@ -67,6 +70,8 @@ const closeList = () => {
   }, LIST_EXIT_DURATION)
   flipWords(false, last)
 }
+
+let listTimeout: ReturnType<typeof setTimeout> | undefined
 
 let flipCleanup: ReturnType<typeof setTimeout> | undefined
 
@@ -161,18 +166,26 @@ const handleWebGLUnsupported = () => {
             ref="wordSubEl"
             class="word-sub"
             :class="{ active: mode === 'lista' }"
+            role="button"
+            tabindex="0"
             @click="openList"
+            @keydown.enter="openList"
+            @keydown.space.prevent="openList"
           ><span v-for="(ch, i) in WORD_SUB" :key="i" class="char">{{ ch }}</span></span>
           <svg
             class="star"
             :class="{ rotated: layoutVertical }"
             viewBox="0 0 24 24"
+            role="button"
+            tabindex="0"
             aria-hidden="true"
             @click="closeList"
+            @keydown.enter="closeList"
+            @keydown.space.prevent="closeList"
           >
             <path d="M22.5 12 L14.47 9.53 L12 1.5 L9.53 9.53 L1.5 12 L9.53 14.47 L12 22.5 L14.47 14.47 Z" />
           </svg>
-          <span ref="wordMainEl" class="word-main" @click="closeList"><span v-for="(ch, i) in WORD_MAIN" :key="i" class="char">{{ ch }}</span></span>
+          <span ref="wordMainEl" class="word-main" role="button" tabindex="0" @click="closeList" @keydown.enter="closeList" @keydown.space.prevent="closeList"><span v-for="(ch, i) in WORD_MAIN" :key="i" class="char">{{ ch }}</span></span>
         </h1>
         <ul v-if="mode === 'lista'" class="project-list" :class="{ leaving: listLeaving }">
           <li
