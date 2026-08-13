@@ -1,3 +1,7 @@
+# .agentignore — GIT-001 (30. Política de Control de Versiones)
+# El agente NO DEBE añadir, modificar ni eliminar archivos listados aquí.
+# Incluye todos los patrones de .gitignore más los específicos del agente.
+
 # Build outputs
 .output
 .data
@@ -48,7 +52,20 @@ referencias/
 # Local dev screenshots
 *.png
 
-# Project Memory (24) — contexto operativo del agente, no versionado
+# --- Específicos del agente ---
+
+# Archivos de diálogo o conversación
+*_dialog.md
+*_chat.log
+conversation_*.txt
+*_prompt_*.md
+
+# Archivos temporales del agente
+*.tmp
+*.cache
+*.draft
+
+# Memoria del Proyecto (24) — no versionada por instrucción del usuario
 13_DECISION_LOG.md
 14_KNOWN_PROBLEMS.md
 15_OPEN_QUESTIONS.md
