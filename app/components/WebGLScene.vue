@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import * as THREE from 'three'
-import { detectWebGLSupport, getDPR, type WebGLTier } from '~/composables/useWebGLTier'
+import { detectWebGLSupport, getDPR } from '~/composables/useWebGLTier'
 
 export interface SceneContext {
   scene: THREE.Scene
   camera: THREE.PerspectiveCamera
   renderer: THREE.WebGLRenderer
-  tier: WebGLTier
   registerRenderCallback: (cb: (deltaTime: number, elapsedTime: number) => void) => void
   unregisterRenderCallback: (cb: (deltaTime: number, elapsedTime: number) => void) => void
   registerResizeCallback: (cb: (width: number, height: number) => void) => void
@@ -17,10 +16,12 @@ const props = withDefaults(defineProps<{
   clearColor?: number
   fov?: number
   cameraZ?: number
+  cameraX?: number
 }>(), {
   clearColor: 0xffffff,
   fov: 75,
   cameraZ: 5,
+  cameraX: 0,
 })
 
 const emit = defineEmits<{
@@ -69,11 +70,11 @@ const setupScene = () => {
 
   const width = parent.clientWidth
   const height = parent.clientHeight
-  const dpr = getDPR('mid')
+  const dpr = getDPR()
 
   scene = new THREE.Scene()
   camera = new THREE.PerspectiveCamera(props.fov, width / height, 0.1, 100)
-  camera.position.set(0, 0, props.cameraZ)
+  camera.position.set(props.cameraX, 0, props.cameraZ)
 
   renderer = new THREE.WebGLRenderer({
     canvas,
@@ -93,7 +94,6 @@ const setupScene = () => {
     scene,
     camera,
     renderer,
-    tier: 'mid',
     registerRenderCallback,
     unregisterRenderCallback,
     registerResizeCallback,
@@ -104,7 +104,7 @@ const setupScene = () => {
     animationId = requestAnimationFrame(animate)
     if (!timer || !renderer || !scene || !camera) return
     timer.update()
-    const delta = timer.getDelta()
+    const delta = Math.min(timer.getDelta(), 0.05)
     const elapsed = timer.getElapsed()
     for (const cb of renderCallbacks) cb(delta, elapsed)
     renderer.render(scene, camera)

@@ -1,285 +1,238 @@
 <script setup lang="ts">
 import * as THREE from 'three'
 import { cardVertexShader, cardFragmentShader } from '~/shaders/cardShader'
-import { useGalleryScroll } from '~/composables/useGalleryScroll'
-import { useAudioClick } from '~/composables/useAudioClick'
 import type { SceneContext } from '~/components/WebGLScene.vue'
 
-const CARD_COUNT = 10
-const PROJECT_COUNT = 4
-const CARD_WIDTH = 1.3
-const CARD_HEIGHT = 1.0
-const CARD_SEGMENTS = 16
-const SPACING = 2.2
-const Y_OFFSET = 1.5
-const VERTICAL_CURVE = 0.012
-const Z_POW = 1.0
-const Z_COEFF = 0.25
-const SCALE_FALLOFF_PER_UNIT = 0.045
-const SCALE_MIN = 0.55
-const MESH_CURVATURE = 0.5
-const STRETCH_FACTOR = 0.35
-const ROTATION_BLEND = 0.2
-const FADE_BAND = SPACING
+const CARD_SIZE = 0.85
+const CARD_SEGMENTS = 1
+const SPACING = 0.95
+const ROW_Y = 0.95
+const ROW_Z = 0
+const CORNER_RADIUS_PX = 12
+
+const BASE_DRIFT = 0.15
+const WHEEL_SENSITIVITY = 0.012
+const WHEEL_FACTOR = 0.8
+const WHEEL_DECAY_RATE = 1.2
+const TOUCH_SENSITIVITY = 0.016
+const SMOOTH_RATE = 6
+const FLIP_THRESHOLD = 0.4
+
+const FADE_DURATION = 0.6
+const FADE_OUT_DURATION = 0.45
+const FINAL_OPACITY = 0.95
 
 const PROJECTS = [
-  { color: 0x1B2A5E, texture: '/images/projects/project-0.webp' },
-  { color: 0xE89A3F, texture: '/images/projects/project-1.webp' },
-  { color: 0xB83A2A, texture: '/images/projects/project-2.webp' },
-  { color: 0x2747A8, texture: '/images/projects/project-3.webp' },
+  '/images/projects/project-0.webp',
+  '/images/projects/project-1.webp',
+  '/images/projects/project-2.webp',
+  '/images/projects/project-3.webp',
 ]
+
+const CARDS_PER_ROW = 16
+const ROW_COUNT = 2
+const CARD_COUNT = CARDS_PER_ROW * ROW_COUNT
+const ROW_WIDTH = CARDS_PER_ROW * SPACING
+const ROW_DIRS = [1, -1]
 
 interface Props {
   ctx: SceneContext
+  fading?: boolean
 }
 
 const props = defineProps<Props>()
+const emit = defineEmits<{ 'fade-complete': [] }>()
 
 const meshes: THREE.Mesh[] = []
 const materials: THREE.ShaderMaterial[] = []
-const textures: THREE.Texture[] = []
-let sharedGeometry: THREE.PlaneGeometry | null = null
+const baseX: number[] = []
+const rowIndexes: number[] = []
+
 let renderCallback: ((deltaTime: number, elapsedTime: number) => void) | null = null
-let texturesReady = false
 
-const cardOffsets: number[] = []
-const cardArcUpper: boolean[] = []
-const scratchP = new THREE.Vector3()
-const scratchAhead = new THREE.Vector3()
-const scratchTangent = new THREE.Vector3()
-const scratchTarget = new THREE.Vector3()
-const scratchCamTarget = new THREE.Vector3()
+let wheelVel = 0
+let smoothVel = 0
+let driftDir = 1
+let lastTouchY: number | null = null
+const rowOffsets = [0, 0]
 
-const { state: scroll, step: scrollStep, bind: bindScroll, unbind: unbindScroll } = useGalleryScroll()
-const { resume: resumeAudio, playClick } = useAudioClick()
-
-const computeArcPoint = (t: number, isUpper: boolean, out: THREE.Vector3) => {
-  const x = t
-  const yBase = isUpper ? Y_OFFSET : -Y_OFFSET
-  const yParabola = t * t * VERTICAL_CURVE
-  const y = isUpper ? yBase + yParabola : yBase - yParabola
-  const z = -Math.pow(Math.abs(t), Z_POW) * Z_COEFF
-  out.set(x, y, z)
+const onWheel = (e: WheelEvent) => {
+  wheelVel += e.deltaY * WHEEL_SENSITIVITY
 }
 
-const computeScale = (t: number) => {
-  return Math.max(SCALE_MIN, 1.0 - Math.abs(t) * SCALE_FALLOFF_PER_UNIT)
+const onTouchStart = (e: TouchEvent) => {
+  const t = e.touches[0]
+  if (t) lastTouchY = t.clientY
 }
 
-const loadProjectTextures = async () => {
+const onTouchMove = (e: TouchEvent) => {
+  const t = e.touches[0]
+  if (!t || lastTouchY === null) return
+  const dy = lastTouchY - t.clientY
+  lastTouchY = t.clientY
+  wheelVel += dy * TOUCH_SENSITIVITY
+}
+
+const onTouchEnd = () => {
+  lastTouchY = null
+}
+
+const applyCornerRadius = (viewportHeight: number) => {
+  const cam = props.ctx.camera
+  const dist = cam.position.z - ROW_Z
+  const projectedSize = (CARD_SIZE / dist) * (viewportHeight / (2 * Math.tan((cam.fov * Math.PI) / 360)))
+  const radius = Math.min(CORNER_RADIUS_PX / projectedSize, 0.5)
+  for (const material of materials) {
+    material.uniforms.uRadius!.value = radius
+  }
+}
+
+const onResize = (_width: number, height: number) => {
+  applyCornerRadius(height)
+}
+
+const loadTexture = async (url: string) => {
   const loader = new THREE.TextureLoader()
-  const aspectMap = new Map<number, number>()
-  const loadPromises: Promise<void>[] = []
-
-  for (let i = 0; i < PROJECT_COUNT; i++) {
-    const url = PROJECTS[i].texture
-    loadPromises.push(
-      (async () => {
-        try {
-          const tex = await loader.loadAsync(url)
-          tex.colorSpace = THREE.SRGBColorSpace
-          tex.minFilter = THREE.LinearMipMapLinearFilter
-          tex.magFilter = THREE.LinearFilter
-          tex.generateMipmaps = true
-          tex.anisotropy = 4
-          tex.needsUpdate = true
-          textures[i] = tex
-          const img = (tex as THREE.Texture & { image?: HTMLImageElement }).image
-          aspectMap.set(i, img && img.width && img.height ? img.width / img.height : 1.0)
-        } catch {
-          aspectMap.set(i, 1.0)
-        }
-      })()
-    )
-  }
-
-  await Promise.all(loadPromises)
-
-  for (let i = 0; i < CARD_COUNT; i++) {
-    const projectIndex = i % PROJECT_COUNT
-    if (materials[i] && textures[projectIndex]) {
-      materials[i].uniforms.uTexture.value = textures[projectIndex]
-      materials[i].uniforms.uTextureAspect.value = aspectMap.get(projectIndex) ?? 1.0
-      materials[i].uniforms.uHasTexture.value = 1.0
-      materials[i].needsUpdate = true
-    } else if (materials[i]) {
-      materials[i].uniforms.uHasTexture.value = 0.0
-    }
-  }
-
-  texturesReady = true
-
-  for (let i = 0; i < CARD_COUNT; i++) {
-    materials[i].uniforms.uOpacity.value = 0.95
+  try {
+    const tex = await loader.loadAsync(url)
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.minFilter = THREE.LinearMipMapLinearFilter
+    tex.magFilter = THREE.LinearFilter
+    tex.generateMipmaps = true
+    tex.anisotropy = 4
+    tex.needsUpdate = true
+    const img = (tex as THREE.Texture & { image?: HTMLImageElement }).image
+    const aspect = img && img.width && img.height ? img.width / img.height : 1.0
+    return { tex, aspect }
+  } catch {
+    return null
   }
 }
 
-const buildCluster = () => {
-  sharedGeometry = new THREE.PlaneGeometry(CARD_WIDTH, CARD_HEIGHT, CARD_SEGMENTS, CARD_SEGMENTS)
+const buildRows = async () => {
+  const geometry = new THREE.PlaneGeometry(CARD_SIZE, CARD_SIZE, CARD_SEGMENTS, CARD_SEGMENTS)
+  const texInfos = await Promise.all(PROJECTS.map(loadTexture))
 
-  for (let i = 0; i < CARD_COUNT; i++) {
-    const t = (i + 0.5 - CARD_COUNT / 2) * SPACING
-    cardOffsets.push(t)
-    const isUpper = i % 2 === 0
-    cardArcUpper.push(isUpper)
-
-    const projectIndex = i % PROJECT_COUNT
-    const project = PROJECTS[projectIndex]
-
+  for (let pi = 0; pi < PROJECTS.length; pi++) {
     const material = new THREE.ShaderMaterial({
       vertexShader: cardVertexShader,
       fragmentShader: cardFragmentShader,
       uniforms: {
-        uCurvature: { value: MESH_CURVATURE },
-        uTime: { value: 0 },
-        uResolution: { value: new THREE.Vector2(CARD_WIDTH, CARD_HEIGHT) },
-        uColor: { value: new THREE.Color(project.color) },
-        uRadius: { value: 0.15 },
+        uResolution: { value: new THREE.Vector2(CARD_SIZE, CARD_SIZE) },
+        uColor: { value: new THREE.Color(0x1a1a2e) },
+        uRadius: { value: 0 },
         uOpacity: { value: 0 },
-        uStretch: { value: 0 },
         uTexture: { value: new THREE.Texture() },
         uTextureAspect: { value: 1.0 },
         uHasTexture: { value: 0.0 },
       },
       transparent: true,
-      side: THREE.DoubleSide,
     })
-
-    const mesh = new THREE.Mesh(sharedGeometry, material)
-    mesh.visible = false
-
-    const p = new THREE.Vector3()
-    computeArcPoint(t, isUpper, p)
-    mesh.position.copy(p)
-    mesh.scale.setScalar(computeScale(t))
-
-    const ahead = new THREE.Vector3()
-    computeArcPoint(t + 0.1, isUpper, ahead)
-    const tangent = new THREE.Vector3().subVectors(ahead, p).normalize()
-    const target = new THREE.Vector3().addVectors(p, tangent)
-    mesh.lookAt(target)
-
-    mesh.userData = { cardIndex: i, projectIndex }
-
-    props.ctx.scene.add(mesh)
-    meshes.push(mesh)
+    const info = texInfos[pi]
+    if (info) {
+      material.uniforms.uTexture!.value = info.tex
+      material.uniforms.uTextureAspect!.value = info.aspect
+      material.uniforms.uHasTexture!.value = 1.0
+    }
+    material.needsUpdate = true
     materials.push(material)
   }
 
-  loadProjectTextures().then(() => {
-    for (const mesh of meshes) mesh.visible = true
-  })
+  applyCornerRadius(window.innerHeight)
+  props.ctx.registerResizeCallback(onResize)
 
-  renderCallback = (delta: number, elapsed: number) => {
-    scrollStep(delta)
-    const camZ = props.ctx.camera.position.z
-    const span = (CARD_COUNT - 1) * SPACING
-    const limit = span / 2 + SPACING * 1.5
+  for (let i = 0; i < CARD_COUNT; i++) {
+    const row = Math.floor(i / CARDS_PER_ROW)
+    const col = i % CARDS_PER_ROW
+    const mesh = new THREE.Mesh(geometry, materials[i % materials.length])
+    mesh.position.set(0, row === 0 ? ROW_Y : -ROW_Y, ROW_Z)
+    mesh.visible = false
+    props.ctx.scene.add(mesh)
+    meshes.push(mesh)
+    baseX.push(col * SPACING - ROW_WIDTH / 2)
+    rowIndexes.push(row)
+  }
 
-    for (let i = 0; i < CARD_COUNT; i++) {
-      const mesh = meshes[i]
-      const material = materials[i]
-      const isUpper = cardArcUpper[i]
-      material.uniforms.uTime.value = elapsed
+  let fadeStart: number | null = null
+  let fadeOutStart: number | null = null
+  let fadeCompleteSent = false
 
-      let t = cardOffsets[i] + scroll.current
+  renderCallback = (deltaTime: number, elapsedTime: number) => {
+    wheelVel *= Math.exp(-WHEEL_DECAY_RATE * deltaTime)
+    smoothVel += (wheelVel - smoothVel) * (1 - Math.exp(-SMOOTH_RATE * deltaTime))
 
-      while (t > limit) {
-        t -= span + SPACING * 2
-        cardOffsets[i] -= span + SPACING * 2
-        const idx = ((Math.round(cardOffsets[i] / SPACING) % PROJECT_COUNT) + PROJECT_COUNT) % PROJECT_COUNT
-        mesh.userData.projectIndex = idx
-        material.uniforms.uColor.value = new THREE.Color(PROJECTS[idx].color)
-        if (textures[idx]) {
-          material.uniforms.uTexture.value = textures[idx]
-          material.uniforms.uHasTexture.value = 1.0
-        }
-      }
-      while (t < -limit) {
-        t += span + SPACING * 2
-        cardOffsets[i] += span + SPACING * 2
-        const idx = ((Math.round(cardOffsets[i] / SPACING) % PROJECT_COUNT) + PROJECT_COUNT) % PROJECT_COUNT
-        mesh.userData.projectIndex = idx
-        material.uniforms.uColor.value = new THREE.Color(PROJECTS[idx].color)
-        if (textures[idx]) {
-          material.uniforms.uTexture.value = textures[idx]
-          material.uniforms.uHasTexture.value = 1.0
-        }
-      }
+    if (Math.abs(smoothVel) > FLIP_THRESHOLD && Math.sign(smoothVel) !== driftDir) {
+      driftDir = Math.sign(smoothVel)
+    }
+    const factor = 1 + Math.max(0, smoothVel * WHEEL_FACTOR * driftDir)
 
-      computeArcPoint(t, isUpper, scratchP)
-      mesh.position.copy(scratchP)
-      mesh.scale.setScalar(computeScale(t))
-
-      computeArcPoint(t + 0.1, isUpper, scratchAhead)
-      scratchTangent.subVectors(scratchAhead, scratchP).normalize()
-      scratchTarget.copy(scratchP).add(scratchTangent)
-      scratchCamTarget.set(0, 0, camZ)
-      scratchTarget.lerp(scratchCamTarget, ROTATION_BLEND)
-      mesh.lookAt(scratchTarget)
-
-      if (texturesReady) {
-        const dist = Math.abs(t)
-        const fade = THREE.MathUtils.clamp((limit - dist) / FADE_BAND, 0, 1)
-        material.uniforms.uOpacity.value = 0.95 * fade
-      } else {
-        material.uniforms.uOpacity.value = 0
-      }
-
-      const stretch = THREE.MathUtils.clamp(scroll.velocity * STRETCH_FACTOR, -2.0, 2.0)
-      material.uniforms.uStretch.value = stretch
+    for (let r = 0; r < ROW_COUNT; r++) {
+      rowOffsets[r]! += BASE_DRIFT * ROW_DIRS[r]! * driftDir * factor * deltaTime
+      if (rowOffsets[r]! > ROW_WIDTH) rowOffsets[r]! -= ROW_WIDTH
+      if (rowOffsets[r]! < -ROW_WIDTH) rowOffsets[r]! += ROW_WIDTH
     }
 
-    if (Math.abs(scroll.velocity) > 0.05) {
-      playClick(scroll.velocity)
+    for (let i = 0; i < CARD_COUNT; i++) {
+      const r = rowIndexes[i]!
+      const trackX = (((baseX[i]! + rowOffsets[r]!) % ROW_WIDTH) + ROW_WIDTH) % ROW_WIDTH
+      meshes[i]!.position.x = trackX - ROW_WIDTH / 2
+    }
+
+    let opacity: number
+    if (props.fading) {
+      if (fadeOutStart === null) fadeOutStart = elapsedTime
+      const ft = Math.min((elapsedTime - fadeOutStart) / FADE_OUT_DURATION, 1)
+      opacity = FINAL_OPACITY * (1 - (ft * ft * (3 - 2 * ft)))
+      if (ft >= 1 && !fadeCompleteSent) {
+        fadeCompleteSent = true
+        emit('fade-complete')
+      }
+    } else {
+      if (fadeStart === null) fadeStart = elapsedTime
+      const t = Math.min((elapsedTime - fadeStart) / FADE_DURATION, 1)
+      opacity = FINAL_OPACITY * (t * t * (3 - 2 * t))
+    }
+    for (const material of materials) {
+      material.uniforms.uOpacity!.value = opacity
     }
   }
 
+  for (const mesh of meshes) mesh.visible = true
   props.ctx.registerRenderCallback(renderCallback)
 }
 
-async function handleFirstInput() {
-  await resumeAudio()
-  window.removeEventListener('wheel', handleFirstInput)
-  window.removeEventListener('touchstart', handleFirstInput)
-  window.removeEventListener('pointerdown', handleFirstInput)
-}
-
 onMounted(() => {
-  buildCluster()
-  bindScroll()
-  if (typeof window !== 'undefined') {
-    window.addEventListener('wheel', handleFirstInput, { passive: false })
-    window.addEventListener('touchstart', handleFirstInput, { passive: true })
-    window.addEventListener('pointerdown', handleFirstInput)
-  }
+  window.addEventListener('wheel', onWheel, { passive: true })
+  window.addEventListener('touchstart', onTouchStart, { passive: true })
+  window.addEventListener('touchmove', onTouchMove, { passive: true })
+  window.addEventListener('touchend', onTouchEnd, { passive: true })
+  window.addEventListener('touchcancel', onTouchEnd, { passive: true })
+  buildRows()
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('wheel', onWheel)
+  window.removeEventListener('touchstart', onTouchStart)
+  window.removeEventListener('touchmove', onTouchMove)
+  window.removeEventListener('touchend', onTouchEnd)
+  window.removeEventListener('touchcancel', onTouchEnd)
   if (renderCallback && props.ctx.unregisterRenderCallback) {
     props.ctx.unregisterRenderCallback(renderCallback)
     renderCallback = null
   }
-  unbindScroll()
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('wheel', handleFirstInput)
-    window.removeEventListener('touchstart', handleFirstInput)
-    window.removeEventListener('pointerdown', handleFirstInput)
+  if (props.ctx.unregisterResizeCallback) {
+    props.ctx.unregisterResizeCallback(onResize)
   }
   for (const mesh of meshes) {
     props.ctx.scene.remove(mesh)
   }
   for (const material of materials) {
-    material.dispose()
-  }
-  for (const tex of textures) {
-    if (tex) tex.dispose()
+    material.uniforms.uTexture!.value.dispose()
   }
   meshes.length = 0
   materials.length = 0
-  textures.length = 0
-  sharedGeometry?.dispose()
-  sharedGeometry = null
+  baseX.length = 0
+  rowIndexes.length = 0
 })
 </script>
 

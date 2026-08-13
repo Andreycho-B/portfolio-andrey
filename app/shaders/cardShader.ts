@@ -1,28 +1,13 @@
 export const cardVertexShader = /* glsl */ `
-  uniform float uCurvature;
-  uniform float uTime;
-  uniform vec2 uResolution;
-  uniform float uStretch;
-
   varying vec2 vUv;
-  varying float vBend;
 
   void main() {
     vUv = uv;
-
-    vec3 transformed = position;
-    float bend = pow(uv.x - 0.5, 2.0) * uCurvature;
-    float stretch = 1.0 + uStretch * 0.25;
-    transformed.z -= bend * stretch;
-    transformed.x *= stretch;
-    vBend = bend * stretch;
-
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `
 
 export const cardFragmentShader = /* glsl */ `
-  uniform float uTime;
   uniform vec3 uColor;
   uniform float uRadius;
   uniform float uOpacity;
@@ -32,7 +17,6 @@ export const cardFragmentShader = /* glsl */ `
   uniform float uHasTexture;
 
   varying vec2 vUv;
-  varying float vBend;
 
   float roundedBoxSDF(vec2 p, vec2 b, float r) {
     vec2 q = abs(p) - b + r;
@@ -76,14 +60,6 @@ export const cardFragmentShader = /* glsl */ `
 
       color = mix(color, texColor.rgb, 0.95);
     }
-
-    float lighting = 1.0 - abs(vBend) * 0.35;
-    color *= lighting;
-
-    // Subtle vignette on card edges
-    float edgeFade = smoothstep(0.0, 0.08, vUv.x) * smoothstep(0.0, 0.08, 1.0 - vUv.x)
-                   * smoothstep(0.0, 0.08, vUv.y) * smoothstep(0.0, 0.08, 1.0 - vUv.y);
-    color *= mix(0.85, 1.0, edgeFade);
 
     gl_FragColor = vec4(color, alpha * uOpacity);
   }
