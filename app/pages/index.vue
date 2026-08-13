@@ -27,19 +27,87 @@ const sceneCtx = ref<SceneContext | null>(null)
 const fontReady = ref(false)
 const mode = ref<'carrusel' | 'lista'>('carrusel')
 const projects = ['AI ESTANDAR', 'TU SUPER', 'AMATISTA', 'CONFY HOUSE']
+const WORD_SUB = [...'lista']
+const WORD_MAIN = [...'Carrusel']
 const marqueeVisible = ref(true)
 const marqueeFading = ref(false)
+const listLeaving = ref(false)
+const wordSubEl = ref<HTMLElement | null>(null)
+const wordMainEl = ref<HTMLElement | null>(null)
+
+const LIST_EXIT_DURATION = 700
+
+const layoutVertical = computed(() => mode.value === 'lista' && !listLeaving.value)
+
+const flipSnapshot = () => {
+  const els = [
+    ...(wordSubEl.value?.querySelectorAll<HTMLElement>('.char') ?? []),
+    ...(wordMainEl.value?.querySelectorAll<HTMLElement>('.char') ?? []),
+  ]
+  return els.map((el) => el.getBoundingClientRect())
+}
 
 const openList = () => {
   if (mode.value === 'lista') return
+  const last = flipSnapshot()
   mode.value = 'lista'
   marqueeFading.value = true
+  flipWords(true, last)
 }
 
 const closeList = () => {
-  mode.value = 'carrusel'
-  marqueeFading.value = false
-  marqueeVisible.value = true
+  if (listLeaving.value) return
+  const last = flipSnapshot()
+  listLeaving.value = true
+  setTimeout(() => {
+    mode.value = 'carrusel'
+    marqueeFading.value = false
+    marqueeVisible.value = true
+    listLeaving.value = false
+  }, LIST_EXIT_DURATION)
+  flipWords(false, last)
+}
+
+let flipCleanup: ReturnType<typeof setTimeout> | undefined
+
+const flipWords = (entering: boolean, last: DOMRect[]) => {
+  const els = [
+    ...(wordSubEl.value?.querySelectorAll<HTMLElement>('.char') ?? []),
+    ...(wordMainEl.value?.querySelectorAll<HTMLElement>('.char') ?? []),
+  ]
+  if (!els.length) return
+  clearTimeout(flipCleanup)
+  els.forEach((el) => el.getAnimations().forEach((a) => a.cancel()))
+  const n = els.length
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      const first = els.map((el) => el.getBoundingClientRect())
+      let moved = false
+      els.forEach((el, i) => {
+        const dx = last[i]!.left - first[i]!.left
+        const dy = last[i]!.top - first[i]!.top
+        if (!dx && !dy) return
+        moved = true
+        const delay = entering ? i * 0.035 : (n - 1 - i) * 0.035
+        el.animate(
+          [
+            { transform: `translate(${dx}px, ${dy}px)` },
+            { transform: 'translate(0px, 0px)' },
+          ],
+          {
+            duration: 600,
+            delay: delay * 1000,
+            easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+            fill: 'both',
+          },
+        )
+      })
+      if (!moved) return
+      flipCleanup = setTimeout(() => {
+        els.forEach((el) => el.getAnimations().forEach((a) => a.cancel()))
+      }, 1250)
+    })
+  })
 }
 
 const handleMarqueeFaded = () => {
@@ -87,25 +155,26 @@ const handleWebGLUnsupported = () => {
       <div class="overlay">
         <h1
           class="portfolio-text"
-          :class="{ 'font-ready': fontReady, vertical: mode === 'lista' }"
+          :class="{ 'font-ready': fontReady, vertical: layoutVertical }"
         >
           <span
+            ref="wordSubEl"
             class="word-sub"
             :class="{ active: mode === 'lista' }"
             @click="openList"
-          >lista</span>
+          ><span v-for="(ch, i) in WORD_SUB" :key="i" class="char">{{ ch }}</span></span>
           <svg
             class="star"
-            :class="{ rotated: mode === 'lista' }"
+            :class="{ rotated: layoutVertical }"
             viewBox="0 0 24 24"
             aria-hidden="true"
             @click="closeList"
           >
             <path d="M22.5 12 L14.47 9.53 L12 1.5 L9.53 9.53 L1.5 12 L9.53 14.47 L12 22.5 L14.47 14.47 Z" />
           </svg>
-          <span class="word-main" @click="closeList">Carrusel</span>
+          <span ref="wordMainEl" class="word-main" @click="closeList"><span v-for="(ch, i) in WORD_MAIN" :key="i" class="char">{{ ch }}</span></span>
         </h1>
-        <ul v-if="mode === 'lista'" class="project-list">
+        <ul v-if="mode === 'lista'" class="project-list" :class="{ leaving: listLeaving }">
           <li
             v-for="(project, i) in projects"
             :key="project"
@@ -205,6 +274,10 @@ const handleWebGLUnsupported = () => {
     color 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.char {
+  display: inline-block;
+}
+
 .word-main:hover,
 .word-sub:hover,
 .star:hover {
@@ -265,11 +338,16 @@ const handleWebGLUnsupported = () => {
   cursor: pointer;
   pointer-events: auto;
   opacity: 0;
-  animation: item-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: calc(0.5s + var(--i) * 0.07s);
+  animation: item-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(0.55s + var(--i) * 0.09s);
   transition:
     color 0.4s ease,
     letter-spacing 0.4s ease;
+}
+
+.project-list.leaving li {
+  animation: item-out 0.4s cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation-delay: calc(var(--i) * 0.06s);
 }
 
 .project-list li:hover {
@@ -285,6 +363,13 @@ const handleWebGLUnsupported = () => {
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes item-out {
+  to {
+    opacity: 0;
+    transform: translateY(-12px);
   }
 }
 
@@ -307,6 +392,17 @@ const handleWebGLUnsupported = () => {
 
   .portfolio-text.vertical {
     flex-direction: column;
+  }
+
+  .portfolio-text.vertical .word-sub,
+  .portfolio-text.vertical .word-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .portfolio-text.vertical .char {
+    line-height: 1;
   }
 
   .portfolio-text.vertical .star {
