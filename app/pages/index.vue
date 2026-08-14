@@ -181,8 +181,8 @@ const handleWebGLUnsupported = () => {
     <WebGLScene
       v-if="webglSupported"
       :clear-color="0xffffff"
-      :fov="57.8"
-      :camera-z="3.5"
+      :fov="72"
+      :camera-z="3.8"
       :camera-x="0"
       @webgl-unsupported="handleWebGLUnsupported"
       @scene-ready="handleSceneReady"
@@ -287,7 +287,7 @@ const handleWebGLUnsupported = () => {
   display: flex;
   align-items: center;
   font-family: 'Space Grotesk Variable', sans-serif;
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   color: #6b7280;
   margin: 0;
   opacity: 0;
@@ -301,7 +301,7 @@ const handleWebGLUnsupported = () => {
 
 .word-main {
   font-family: 'Le Murmure', 'Space Grotesk Variable', sans-serif;
-  font-size: 2.4rem;
+  font-size: 2.1rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -424,7 +424,7 @@ const handleWebGLUnsupported = () => {
   }
 
   .portfolio-text {
-    font-size: 1.15rem;
+    font-size: 1.05rem;
   }
 
   .portfolio-text.vertical {
@@ -447,7 +447,7 @@ const handleWebGLUnsupported = () => {
   }
 
   .word-main {
-    font-size: 1.7rem;
+    font-size: 1.5rem;
   }
 
   .project-list {

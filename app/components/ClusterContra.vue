@@ -14,16 +14,22 @@ const TOP_PEAK = 0.33
 const TOP_WIDTH = 0.39
 const FADE_EDGE_IN = 0.88
 const FADE_EDGE_OUT = 1.0
+// Fracción de halfW donde cae la zona de gravedad: tras el texto (86%) y pegada al borde derecho en cualquier aspect
+const ZONE_FRACTION = 0.93
 
 const fadeEdges = new THREE.Vector4()
 
 const BASE_DRIFT = 0.15
+const DRIFT_DIR = -1
+const INTRO_SPEED = 6
+const INTRO_DECAY_RATE = 0.7
 const WHEEL_SENSITIVITY = 0.025
-const WHEEL_FACTOR = 1.2
 const WHEEL_DECAY_RATE = 1.2
+const SCROLL_CAP = 2.5
+const REVERSE_DAMP = 0.4
 const TOUCH_SENSITIVITY = 0.032
 const SMOOTH_RATE = 6
-const FLIP_THRESHOLD = 0.4
+const MAX_VELOCITY = 3
 
 const FADE_DURATION = 0.6
 const FADE_OUT_DURATION = 0.6
@@ -61,15 +67,19 @@ let renderCallback: ((deltaTime: number, elapsedTime: number) => void) | null = 
 
 let disposed = false
 
+let introPlayed = false
+
 let wheelVel = 0
 let smoothVel = 0
-let driftDir = 1
+let introVel = 0
+let prevOffset = 0
+let currentVelocity = 0
 let lastTouchY: number | null = null
 const rowOffsets = [0, 0]
 
 const onWheel = (e: WheelEvent) => {
   const delta = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 16 : e.deltaY
-  wheelVel += delta * WHEEL_SENSITIVITY
+  applyScrollImpulse(delta * WHEEL_SENSITIVITY)
 }
 
 const onTouchStart = (e: TouchEvent) => {
@@ -82,11 +92,20 @@ const onTouchMove = (e: TouchEvent) => {
   if (!t || lastTouchY === null) return
   const dy = lastTouchY - t.clientY
   lastTouchY = t.clientY
-  wheelVel += dy * TOUCH_SENSITIVITY
+  applyScrollImpulse(-dy * TOUCH_SENSITIVITY)
 }
 
 const onTouchEnd = () => {
   lastTouchY = null
+}
+
+const applyScrollImpulse = (imp: number) => {
+  if (imp === 0) return
+  // Impulso en contra del movimiento actual: atenuado por el peso de las tarjetas (revertir exige más scroll)
+  if (wheelVel !== 0 && Math.sign(imp) !== Math.sign(wheelVel)) {
+    imp *= REVERSE_DAMP
+  }
+  wheelVel = Math.min(Math.max(wheelVel + imp, -SCROLL_CAP), SCROLL_CAP)
 }
 
 const applyCornerRadius = (viewportWidth: number, viewportHeight: number) => {
@@ -96,9 +115,11 @@ const applyCornerRadius = (viewportWidth: number, viewportHeight: number) => {
   const radius = Math.min(CORNER_RADIUS_PX / projectedSize, 0.5)
   const halfW = cam.position.z * Math.tan((cam.fov * Math.PI) / 360) * (viewportWidth / viewportHeight)
   fadeEdges.set(-halfW * FADE_EDGE_OUT, -halfW * FADE_EDGE_IN, halfW * FADE_EDGE_IN, halfW * FADE_EDGE_OUT)
+  const zoneX = halfW * ZONE_FRACTION
   for (const material of materials) {
     material.uniforms.uRadius!.value = radius
     material.uniforms.uFadeEdges!.value.copy(fadeEdges)
+    material.uniforms.uZoneCenter!.value = zoneX
   }
 }
 
@@ -146,6 +167,8 @@ const buildRows = async () => {
         uTextureAspect: { value: 1.0 },
         uHasTexture: { value: 0.0 },
         uFadeEdges: { value: fadeEdges.clone() },
+        uZoneCenter: { value: 0 },
+        uVelocity: { value: 0 },
       },
       transparent: true,
     })
@@ -180,18 +203,33 @@ const buildRows = async () => {
   let fadeCompleteSent = false
 
   renderCallback = (deltaTime: number, elapsedTime: number) => {
+    if (!introPlayed) {
+      introPlayed = true
+      introVel = INTRO_SPEED
+    }
+    if (introVel > 0) {
+      introVel *= Math.exp(-INTRO_DECAY_RATE * deltaTime)
+      if (introVel < 0.01) introVel = 0
+    }
     wheelVel *= Math.exp(-WHEEL_DECAY_RATE * deltaTime)
+    if (Math.abs(wheelVel) < 0.005) wheelVel = 0
     smoothVel += (wheelVel - smoothVel) * (1 - Math.exp(-SMOOTH_RATE * deltaTime))
 
-    if (Math.abs(smoothVel) > FLIP_THRESHOLD && Math.sign(smoothVel) !== driftDir) {
-      driftDir = Math.sign(smoothVel)
-    }
-    const factor = 1 + Math.max(0, smoothVel * WHEEL_FACTOR * driftDir)
-
     for (let r = 0; r < ROW_COUNT; r++) {
-      rowOffsets[r]! += BASE_DRIFT * ROW_DIRS[r]! * driftDir * factor * deltaTime
+      rowOffsets[r]! += (BASE_DRIFT * ROW_DIRS[r]! * DRIFT_DIR + smoothVel + introVel) * deltaTime
       if (rowOffsets[r]! > ROW_WIDTH) rowOffsets[r]! -= ROW_WIDTH
       if (rowOffsets[r]! < -ROW_WIDTH) rowOffsets[r]! += ROW_WIDTH
+    }
+
+    let deltaX = rowOffsets[0]! - prevOffset
+    prevOffset = rowOffsets[0]!
+    if (Math.abs(deltaX) > ROW_WIDTH * 0.5) deltaX = 0
+
+    const targetVelocity = Math.min(Math.max(deltaX / (deltaTime || 0.016), -MAX_VELOCITY), MAX_VELOCITY)
+    currentVelocity += (targetVelocity - currentVelocity) * 0.12
+
+    for (const material of materials) {
+      material.uniforms.uVelocity!.value = currentVelocity
     }
 
     for (let i = 0; i < CARD_COUNT; i++) {
