@@ -4,6 +4,10 @@ import ClusterContra from '~/components/ClusterContra.vue'
 import type { SceneContext } from '~/components/WebGLScene.vue'
 
 useHead({
+  title: 'Andrey Rondón — Portfolio',
+  meta: [
+    { name: 'description', content: 'Portafolio de Andrey Rondón' },
+  ],
   link: [
     {
       rel: 'preload',
@@ -35,9 +39,14 @@ const listLeaving = ref(false)
 const wordSubEl = ref<HTMLElement | null>(null)
 const wordMainEl = ref<HTMLElement | null>(null)
 
-const LIST_EXIT_DURATION = 700
-
 const layoutVertical = computed(() => mode.value === 'lista' && !listLeaving.value)
+
+let listAnims: Animation[] = []
+
+const cancelListAnims = () => {
+  listAnims.forEach((a) => a.cancel())
+  listAnims = []
+}
 
 const flipSnapshot = () => {
   const els = [
@@ -50,6 +59,7 @@ const flipSnapshot = () => {
 const openList = () => {
   if (mode.value === 'lista' || listLeaving.value) return
   clearTimeout(listTimeout)
+  cancelListAnims()
   const last = flipSnapshot()
   mode.value = 'lista'
   marqueeFading.value = true
@@ -62,12 +72,38 @@ const closeList = () => {
   const last = flipSnapshot()
   listLeaving.value = true
   if (marqueeFading.value) marqueeFading.value = false
+
+  const items = document.querySelectorAll<HTMLElement>('.project-list li')
+  cancelListAnims()
+  const n = items.length
+  let maxEnd = 0
+  items.forEach((el, i) => {
+    const delay = i * 60
+    const anim = el.animate(
+      [
+        { opacity: 1, transform: 'translateY(0px)' },
+        { opacity: 0, transform: 'translateY(-12px)' },
+      ],
+      {
+        duration: 400,
+        delay,
+        easing: 'cubic-bezier(0.4, 0, 1, 1)',
+        fill: 'forwards',
+      },
+    )
+    listAnims.push(anim)
+    const end = delay + 400
+    if (end > maxEnd) maxEnd = end
+  })
+
   listTimeout = setTimeout(() => {
+    cancelListAnims()
     mode.value = 'carrusel'
     marqueeFading.value = false
     marqueeVisible.value = true
     listLeaving.value = false
-  }, LIST_EXIT_DURATION)
+  }, maxEnd + 50)
+
   flipWords(false, last)
 }
 
@@ -178,7 +214,7 @@ const handleWebGLUnsupported = () => {
             viewBox="0 0 24 24"
             role="button"
             tabindex="0"
-            aria-hidden="true"
+            aria-label="volver al carrusel"
             @click="closeList"
             @keydown.enter="closeList"
             @keydown.space.prevent="closeList"
@@ -187,7 +223,7 @@ const handleWebGLUnsupported = () => {
           </svg>
           <span ref="wordMainEl" class="word-main" role="button" tabindex="0" @click="closeList" @keydown.enter="closeList" @keydown.space.prevent="closeList"><span v-for="(ch, i) in WORD_MAIN" :key="i" class="char">{{ ch }}</span></span>
         </h1>
-        <ul v-if="mode === 'lista'" class="project-list" :class="{ leaving: listLeaving }">
+        <ul v-if="mode === 'lista'" class="project-list">
           <li
             v-for="(project, i) in projects"
             :key="project"
@@ -358,11 +394,6 @@ const handleWebGLUnsupported = () => {
     letter-spacing 0.4s ease;
 }
 
-.project-list.leaving li {
-  animation: item-out 0.4s cubic-bezier(0.4, 0, 1, 1) forwards;
-  animation-delay: calc(var(--i) * 0.06s);
-}
-
 .project-list li:hover {
   color: #0000ff;
   letter-spacing: 0.16em;
@@ -376,13 +407,6 @@ const handleWebGLUnsupported = () => {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-
-@keyframes item-out {
-  to {
-    opacity: 0;
-    transform: translateY(-12px);
   }
 }
 

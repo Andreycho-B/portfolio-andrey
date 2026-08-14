@@ -12,22 +12,16 @@ const CORNER_RADIUS_PX = 12
 const TOP_AMP = 0.676
 const TOP_PEAK = 0.33
 const TOP_WIDTH = 0.39
-const FADE_EDGE_IN = 0.9
+const FADE_EDGE_IN = 0.88
 const FADE_EDGE_OUT = 1.0
-
-const INTRO_FUGA = new THREE.Vector3(9.6, 0.35, -10.5)
-const INTRO_DURATION = 1.8
-const INTRO_MAX_DELAY = 0.35
-const INTRO_BACK = 1.2
-const INTRO_ROT = 0.16
 
 const fadeEdges = new THREE.Vector4()
 
 const BASE_DRIFT = 0.15
-const WHEEL_SENSITIVITY = 0.012
-const WHEEL_FACTOR = 0.8
+const WHEEL_SENSITIVITY = 0.025
+const WHEEL_FACTOR = 1.2
 const WHEEL_DECAY_RATE = 1.2
-const TOUCH_SENSITIVITY = 0.016
+const TOUCH_SENSITIVITY = 0.032
 const SMOOTH_RATE = 6
 const FLIP_THRESHOLD = 0.4
 
@@ -60,11 +54,8 @@ const meshes: THREE.Mesh[] = []
 const materials: THREE.ShaderMaterial[] = []
 const baseX: number[] = []
 const rowIndexes: number[] = []
-const introDelays: number[] = []
-const introRots: number[] = []
 
 let sharedGeometry: THREE.PlaneGeometry | null = null
-let introPlayed = false
 
 let renderCallback: ((deltaTime: number, elapsedTime: number) => void) | null = null
 
@@ -136,8 +127,6 @@ const loadTexture = async (url: string) => {
 const buildRows = async () => {
   const geometry = new THREE.PlaneGeometry(CARD_SIZE, CARD_SIZE, CARD_SEGMENTS, CARD_SEGMENTS)
   sharedGeometry = geometry
-  const introEnabled = !introPlayed
-  introPlayed = true
   const texInfos = await Promise.all(PROJECTS.map(loadTexture))
   if (disposed) {
     for (const info of texInfos) info?.tex.dispose()
@@ -183,25 +172,14 @@ const buildRows = async () => {
     meshes.push(mesh)
     const bx = col * SPACING - ROW_WIDTH / 2
     baseX.push(bx)
-    introDelays.push(Math.min(Math.max((ROW_WIDTH / 2 - bx) / ROW_WIDTH, 0), 1) * INTRO_MAX_DELAY)
-    introRots.push((((i * 37) % 11) / 11 - 0.5) * INTRO_ROT)
     rowIndexes.push(row)
   }
 
   let fadeStart: number | null = null
   let fadeOutStart: number | null = null
   let fadeCompleteSent = false
-  let introElapsed = 0
-  let introEnded = false
 
   renderCallback = (deltaTime: number, elapsedTime: number) => {
-    if (introEnabled) introElapsed += deltaTime
-    const introActive = introEnabled && introElapsed < INTRO_DURATION + INTRO_MAX_DELAY
-    if (!introActive && !introEnded) {
-      introEnded = true
-      wheelVel = 0
-      smoothVel = 0
-    }
     wheelVel *= Math.exp(-WHEEL_DECAY_RATE * deltaTime)
     smoothVel += (wheelVel - smoothVel) * (1 - Math.exp(-SMOOTH_RATE * deltaTime))
 
@@ -211,14 +189,10 @@ const buildRows = async () => {
     const factor = 1 + Math.max(0, smoothVel * WHEEL_FACTOR * driftDir)
 
     for (let r = 0; r < ROW_COUNT; r++) {
-      if (introActive) continue
       rowOffsets[r]! += BASE_DRIFT * ROW_DIRS[r]! * driftDir * factor * deltaTime
       if (rowOffsets[r]! > ROW_WIDTH) rowOffsets[r]! -= ROW_WIDTH
       if (rowOffsets[r]! < -ROW_WIDTH) rowOffsets[r]! += ROW_WIDTH
     }
-
-    const c1 = INTRO_BACK + 1
-    const c3 = c1 + 1
 
     for (let i = 0; i < CARD_COUNT; i++) {
       const m = meshes[i]!
@@ -249,18 +223,6 @@ const buildRows = async () => {
         ? -((TOP_AMP * Math.PI) / (2 * TOP_WIDTH * ROW_WIDTH)) * Math.sin(Math.PI * tu)
         : 0
       m.rotation.z = isTop ? slope : -slope
-
-      if (introActive) {
-        const introT = Math.min(Math.max((introElapsed - introDelays[i]!) / INTRO_DURATION, 0), 1)
-        if (introT < 1) {
-          const e = 1 - Math.pow(1 - introT, 5)
-          const ey = 1 + c3 * Math.pow(introT - 1, 3) + c1 * Math.pow(introT - 1, 2)
-          m.position.x = INTRO_FUGA.x + (m.position.x - INTRO_FUGA.x) * e
-          m.position.y = INTRO_FUGA.y + (m.position.y - INTRO_FUGA.y) * ey
-          m.position.z = INTRO_FUGA.z + (m.position.z - INTRO_FUGA.z) * e
-          m.rotation.z += introRots[i]! * (1 - e)
-        }
-      }
     }
 
     let opacity: number
@@ -322,8 +284,6 @@ onBeforeUnmount(() => {
   materials.length = 0
   baseX.length = 0
   rowIndexes.length = 0
-  introDelays.length = 0
-  introRots.length = 0
 })
 </script>
 
