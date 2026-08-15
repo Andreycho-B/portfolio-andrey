@@ -1,5 +1,4 @@
 export const cardVertexShader = /* glsl */ `
-  uniform float uVelocity;
   uniform float uZoneCenter;
   varying vec2 vUv;
   varying float vWorldX;
@@ -55,7 +54,7 @@ export const cardFragmentShader = /* glsl */ `
   uniform float uRadius;
   uniform float uOpacity;
   uniform sampler2D uTexture;
-  uniform vec2 uResolution;
+  uniform float uCardAspect;
   uniform float uTextureAspect;
   uniform float uHasTexture;
   uniform vec4 uFadeEdges;
@@ -87,7 +86,7 @@ export const cardFragmentShader = /* glsl */ `
     vec3 color = uColor;
 
     if (uHasTexture > 0.5) {
-      float cardAspect = uResolution.x / uResolution.y;
+      float cardAspect = uCardAspect;
       float texAspect = uTextureAspect;
 
       vec2 scale = vec2(1.0);
