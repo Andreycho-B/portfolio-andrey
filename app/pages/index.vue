@@ -42,6 +42,7 @@ const wordMainEl = ref<HTMLElement | null>(null)
 const layoutVertical = computed(() => mode.value === 'lista' && !listLeaving.value)
 
 let listAnims: Animation[] = []
+let listTimeout: ReturnType<typeof setTimeout> | undefined
 
 const cancelListAnims = () => {
   listAnims.forEach((a) => a.cancel())
@@ -67,7 +68,7 @@ const openList = () => {
 }
 
 const closeList = () => {
-  if (listLeaving.value) return
+  if (mode.value !== 'lista' || listLeaving.value) return
   clearTimeout(listTimeout)
   const last = flipSnapshot()
   listLeaving.value = true
@@ -106,8 +107,6 @@ const closeList = () => {
 
   flipWords(false, last)
 }
-
-let listTimeout: ReturnType<typeof setTimeout> | undefined
 
 let flipCleanup: ReturnType<typeof setTimeout> | undefined
 

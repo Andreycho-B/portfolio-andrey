@@ -30,6 +30,7 @@ const REVERSE_DAMP = 0.4
 const TOUCH_SENSITIVITY = 0.032
 const SMOOTH_RATE = 6
 const MAX_VELOCITY = 3
+const VELOCITY_SMOOTH_RATE = 7.7
 
 const FADE_DURATION = 0.6
 const FADE_OUT_DURATION = 0.6
@@ -67,7 +68,7 @@ let renderCallback: ((deltaTime: number, elapsedTime: number) => void) | null = 
 
 let disposed = false
 
-let introPlayed = false
+const introPlayed = useState('cluster-contra-intro-played', () => false)
 
 let wheelVel = 0
 let smoothVel = 0
@@ -159,7 +160,7 @@ const buildRows = async () => {
       vertexShader: cardVertexShader,
       fragmentShader: cardFragmentShader,
       uniforms: {
-        uResolution: { value: new THREE.Vector2(CARD_SIZE, CARD_SIZE) },
+        uCardAspect: { value: 1.0 },
         uColor: { value: new THREE.Color(0x1a1a2e) },
         uRadius: { value: 0 },
         uOpacity: { value: 0 },
@@ -167,7 +168,7 @@ const buildRows = async () => {
         uTextureAspect: { value: 1.0 },
         uHasTexture: { value: 0.0 },
         uFadeEdges: { value: fadeEdges.clone() },
-        uZoneCenter: { value: 0 },
+        uZoneCenter: { value: 1 },
         uVelocity: { value: 0 },
       },
       transparent: true,
@@ -203,8 +204,8 @@ const buildRows = async () => {
   let fadeCompleteSent = false
 
   renderCallback = (deltaTime: number, elapsedTime: number) => {
-    if (!introPlayed) {
-      introPlayed = true
+    if (!introPlayed.value) {
+      introPlayed.value = true
       introVel = INTRO_SPEED
     }
     if (introVel > 0) {
@@ -226,7 +227,7 @@ const buildRows = async () => {
     if (Math.abs(deltaX) > ROW_WIDTH * 0.5) deltaX = 0
 
     const targetVelocity = Math.min(Math.max(deltaX / (deltaTime || 0.016), -MAX_VELOCITY), MAX_VELOCITY)
-    currentVelocity += (targetVelocity - currentVelocity) * 0.12
+    currentVelocity += (targetVelocity - currentVelocity) * (1 - Math.exp(-VELOCITY_SMOOTH_RATE * deltaTime))
 
     for (const material of materials) {
       material.uniforms.uVelocity!.value = currentVelocity
@@ -253,7 +254,7 @@ const buildRows = async () => {
       const spread = inBump ? TOP_AMP * 0.5 * (1.0 + Math.cos(Math.PI * tu)) : 0
       m.position.y = sign * (0.7 + spread)
 
-      m.position.z = 0
+      m.position.z = ROW_Z
 
       m.rotation.x = 0
       m.rotation.y = 0
@@ -326,5 +327,5 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <span aria-hidden="true" style="display: none" />
+  <!-- Componente lógico: gestiona el marquee WebGL sin salida visual propia -->
 </template>
