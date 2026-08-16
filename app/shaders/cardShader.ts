@@ -15,12 +15,11 @@ export const cardVertexShader = /* glsl */ `
     // Transformación a View Space
     vec4 mvPosition = viewMatrix * worldPosition;
 
-    // Distorsión óptica de lente suave con énfasis asimétrico izquierdo
+    // Distorsión de profundidad en lente suave
     float radius = length(mvPosition.xy);
-    float sideWeight = 1.0 + 0.45 * smoothstep(0.0, -3.0, mvPosition.x);
+    float sideWeight = 1.0 + 0.35 * smoothstep(0.0, -3.0, mvPosition.x);
 
-    mvPosition.z += pow(radius * 0.22, 2.0) * 0.35 * sideWeight;
-    mvPosition.xy *= 1.0 + pow(radius * 0.18, 2.0) * 0.04 * sideWeight;
+    mvPosition.z += pow(radius * 0.20, 2.0) * 0.25 * sideWeight;
 
     gl_Position = projectionMatrix * mvPosition;
   }
