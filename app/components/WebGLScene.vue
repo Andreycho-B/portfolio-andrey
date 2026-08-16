@@ -79,14 +79,16 @@ const setupScene = () => {
   renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
-    alpha: false,
+    alpha: true,
+    premultipliedAlpha: false,
     powerPreference: 'high-performance',
     stencil: false,
     depth: true,
   })
   renderer.setPixelRatio(dpr)
   renderer.setSize(width, height)
-  renderer.setClearColor(props.clearColor, 1)
+  // Fondo transparente: el blanco y el patrón de puntos los aporta el HTML de detrás (.page)
+  renderer.setClearColor(props.clearColor, 0)
 
   timer = new THREE.Timer()
 

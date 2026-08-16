@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import WebGLScene from '~/components/WebGLScene.vue'
 import ClusterContra from '~/components/ClusterContra.vue'
+import DotPattern from '~/components/DotPattern.vue'
 import type { SceneContext } from '~/components/WebGLScene.vue'
 
 useHead({
@@ -177,6 +178,7 @@ const handleWebGLUnsupported = () => {
 
 <template>
   <main class="page">
+    <DotPattern />
     <WebGLScene
       v-if="webglSupported"
       :clear-color="0xffffff"
@@ -311,8 +313,8 @@ const handleWebGLUnsupported = () => {
 }
 
 .word-sub {
-  font-weight: 400;
-  font-variation-settings: 'wght' 400;
+  font-weight: 300;
+  font-variation-settings: 'wght' 300;
   letter-spacing: 0.04em;
   color: #cbd5e1;
   cursor: pointer;
