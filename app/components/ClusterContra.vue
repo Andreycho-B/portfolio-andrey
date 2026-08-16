@@ -8,7 +8,7 @@ const CARD_SEGMENTS = 16
 const SPACING = 0.95
 const ROW_Y = 0.95
 const ROW_Z = 0
-const CORNER_RADIUS_PX = 12
+const CORNER_RADIUS_PX = 8
 const FADE_EDGE_IN = 0.88
 const FADE_EDGE_OUT = 1.0
 
