@@ -1,5 +1,4 @@
 export const cardVertexShader = /* glsl */ `
-  uniform float uZoneCenter;
   varying vec2 vUv;
   varying float vWorldX;
 
@@ -13,37 +12,15 @@ export const cardVertexShader = /* glsl */ `
     vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
     vWorldX = worldPosition.x;
 
-    // Profundidad continua Z: se hunden hacia el fondo a la derecha sin colisionar
-    float normX = clamp((worldPosition.x + 3.5) / 7.0, 0.0, 1.0);
-    worldPosition.z -= pow(normX, 1.5) * 0.8;
-
-    // Transformación a View Space (posición respecto a la lente de la cámara)
+    // Transformación a View Space
     vec4 mvPosition = viewMatrix * worldPosition;
 
-    // Distorsión de lente (ojo de pez / barrel distortion)
+    // Distorsión óptica de lente suave con énfasis asimétrico izquierdo
     float radius = length(mvPosition.xy);
+    float sideWeight = 1.0 + 0.45 * smoothstep(0.0, -3.0, mvPosition.x);
 
-    // Énfasis del lado izquierdo de la pantalla: la lente se exagera hacia la izquierda (x negativa)
-    float sideWeight = 1.0 + 0.8 * smoothstep(0.0, -3.0, mvPosition.x);
-
-    // Empuje convexo esférico: a mayor distancia del centro visual, más se abomba hacia la cámara (-Z)
-    mvPosition.z += pow(radius * 0.28, 2.2) * 0.45 * sideWeight;
-
-    // Leve deformación radial en X e Y para simular la curvatura óptica de la lente
-    mvPosition.xy *= 1.0 + pow(radius * 0.2, 2.0) * 0.06 * sideWeight;
-
-    // Atracción gravitatoria: rampa exponencial monótona anclada a la pantalla (uZoneCenter = halfW * 0.93, calculado por viewport en ClusterContra).
-    // Arranca en ZONE_START_REL con máscara 0 y crece saturando suavemente hacia ZONE_MAX hasta que el fade desaparece la tarjeta: nunca baja ni cambia bruscamente de dirección.
-    // Fila superior: atrae el borde superior hacia arriba; fila inferior: atrae las puntas hacia abajo.
-    const float ZONE_START_REL = 0.78;
-    const float ZONE_K = 8.0;
-    const float ZONE_MAX = 2.5;
-    float zoneRelX = mvPosition.x / uZoneCenter;
-    float zoneMask = max(ZONE_MAX * (1.0 - exp(-ZONE_K * (zoneRelX - ZONE_START_REL))), 0.0);
-    float zoneRowSign = sign(mvPosition.y);
-    float zoneEdge = zoneRowSign > 0.0 ? uv.y : 1.0 - uv.y;
-    float zoneCurve = (exp(2.0 * zoneEdge) - 1.0) / (exp(2.0) - 1.0);
-    mvPosition.y += 0.3 * zoneMask * zoneCurve * zoneRowSign;
+    mvPosition.z += pow(radius * 0.22, 2.0) * 0.35 * sideWeight;
+    mvPosition.xy *= 1.0 + pow(radius * 0.18, 2.0) * 0.04 * sideWeight;
 
     gl_Position = projectionMatrix * mvPosition;
   }
@@ -108,17 +85,13 @@ export const cardFragmentShader = /* glsl */ `
         texColor = (texColor + sample1 + sample2) / 3.0;
       }
 
-      // Saturation boost (1.4x)
+      // Calibración sutil de saturación y contraste sin posterización ni banding
       vec3 luminance = vec3(dot(texColor.rgb, vec3(0.299, 0.587, 0.114)));
-      texColor.rgb = luminance + 1.4 * (texColor.rgb - luminance);
-
-      // Contrast boost
-      texColor.rgb = (texColor.rgb - 0.5) * 1.15 + 0.5;
-
-      // Clamp to valid range
+      texColor.rgb = luminance + 1.15 * (texColor.rgb - luminance);
+      texColor.rgb = (texColor.rgb - 0.5) * 1.08 + 0.5;
       texColor.rgb = clamp(texColor.rgb, 0.0, 1.0);
 
-      color = mix(color, texColor.rgb, 0.95);
+      color = mix(color, texColor.rgb, 0.98);
     }
 
     gl_FragColor = vec4(color, alpha * uOpacity);
