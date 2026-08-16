@@ -2,6 +2,7 @@
 import WebGLScene from '~/components/WebGLScene.vue'
 import ClusterContra from '~/components/ClusterContra.vue'
 import DotPattern from '~/components/DotPattern.vue'
+import IntroGate from '~/components/IntroGate.vue'
 import type { SceneContext } from '~/components/WebGLScene.vue'
 
 useHead({
@@ -39,6 +40,46 @@ const marqueeFading = ref(false)
 const listLeaving = ref(false)
 const wordSubEl = ref<HTMLElement | null>(null)
 const wordMainEl = ref<HTMLElement | null>(null)
+
+// Portada de entrada: el primer scroll entra con sonido (pad ambiental);
+// los enlaces de la portada permiten decidirlo explícitamente.
+const { start: startAudio } = useAmbientAudio()
+const introResolved = ref(false)
+let soundWanted = false
+
+const scrollToCarousel = () => {
+  window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })
+}
+
+const enterWithSound = async () => {
+  if (introResolved.value) return
+  introResolved.value = true
+  soundWanted = true
+  await startAudio()
+  scrollToCarousel()
+}
+
+const enterSilent = () => {
+  if (introResolved.value) return
+  introResolved.value = true
+  soundWanted = false
+  scrollToCarousel()
+}
+
+const handleIntroScroll = () => {
+  if (introResolved.value) return
+  if (window.scrollY > 10) {
+    introResolved.value = true
+    soundWanted = true
+    void startAudio()
+  }
+}
+
+// Desbloqueo de autoplay: si se pidió sonido y el navegador suspendió el
+// contexto (p. ej. iOS), el primer toque/clic lo reactiva.
+const handlePointerUnlock = () => {
+  if (soundWanted) void startAudio()
+}
 
 const layoutVertical = computed(() => mode.value === 'lista' && !listLeaving.value)
 
@@ -156,6 +197,8 @@ const handleMarqueeFaded = () => {
 }
 
 onMounted(() => {
+  window.addEventListener('scroll', handleIntroScroll, { passive: true })
+  window.addEventListener('pointerdown', handlePointerUnlock)
   const timeout = setTimeout(() => {
     fontReady.value = true
   }, 1500)
@@ -165,6 +208,11 @@ onMounted(() => {
   }
   document.fonts.load('700 1em "Space Grotesk Variable"').then(markReady).catch(markReady)
   document.fonts.load('400 1em "Le Murmure"').then(markReady).catch(markReady)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleIntroScroll)
+  window.removeEventListener('pointerdown', handlePointerUnlock)
 })
 
 const handleSceneReady = (ctx: SceneContext) => {
@@ -177,17 +225,19 @@ const handleWebGLUnsupported = () => {
 </script>
 
 <template>
-  <main class="page">
-    <DotPattern />
-    <WebGLScene
-      v-if="webglSupported"
-      :clear-color="0xffffff"
-      :fov="72"
-      :camera-z="3.8"
-      :camera-x="0"
-      @webgl-unsupported="handleWebGLUnsupported"
-      @scene-ready="handleSceneReady"
-    >
+  <main class="layout">
+    <IntroGate @enter="enterWithSound" @enter-silent="enterSilent" />
+    <div class="page">
+      <DotPattern />
+      <WebGLScene
+        v-if="webglSupported"
+        :clear-color="0xffffff"
+        :fov="72"
+        :camera-z="3.8"
+        :camera-x="0"
+        @webgl-unsupported="handleWebGLUnsupported"
+        @scene-ready="handleSceneReady"
+      >
       <ClusterContra
         v-if="sceneCtx && marqueeVisible"
         :ctx="sceneCtx"
@@ -237,6 +287,7 @@ const handleWebGLUnsupported = () => {
     <div v-if="!webglSupported" class="fallback">
       <h1 class="portfolio-text">portfolio</h1>
     </div>
+    </div>
   </main>
 </template>
 
@@ -258,8 +309,11 @@ const handleWebGLUnsupported = () => {
 }
 
 .page {
-  position: fixed;
-  inset: 0;
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
