@@ -9,13 +9,18 @@ const SPACING = 0.95
 const ROW_Y = 0.95
 const ROW_Z = 0
 const CORNER_RADIUS_PX = 12
-const TOP_AMP = 0.676
-const TOP_PEAK = 0.33
-const TOP_WIDTH = 0.39
 const FADE_EDGE_IN = 0.88
 const FADE_EDGE_OUT = 1.0
-// Fracción de halfW donde cae la zona de gravedad: tras el texto (86%) y pegada al borde derecho en cualquier aspect
-const ZONE_FRACTION = 0.93
+
+// Parámetros de la trayectoria cónica 3D continua "Contra" (Calibración Loop 2)
+const Y_BASE = 0.82
+const Y_AMP = 1.25
+const K_Y = 1.15
+const X_MID = -0.95
+const Z_FRONT = 1.15
+const Z_BACK = 0.35
+const PITCH_MAX = 0.32
+const YAW_MAX = 0.28
 
 const fadeEdges = new THREE.Vector4()
 
@@ -116,11 +121,9 @@ const applyCornerRadius = (viewportWidth: number, viewportHeight: number) => {
   const radius = Math.min(CORNER_RADIUS_PX / projectedSize, 0.5)
   const halfW = cam.position.z * Math.tan((cam.fov * Math.PI) / 360) * (viewportWidth / viewportHeight)
   fadeEdges.set(-halfW * FADE_EDGE_OUT, -halfW * FADE_EDGE_IN, halfW * FADE_EDGE_IN, halfW * FADE_EDGE_OUT)
-  const zoneX = halfW * ZONE_FRACTION
   for (const material of materials) {
     material.uniforms.uRadius!.value = radius
     material.uniforms.uFadeEdges!.value.copy(fadeEdges)
-    material.uniforms.uZoneCenter!.value = zoneX
   }
 }
 
@@ -168,7 +171,6 @@ const buildRows = async () => {
         uTextureAspect: { value: 1.0 },
         uHasTexture: { value: 0.0 },
         uFadeEdges: { value: fadeEdges.clone() },
-        uZoneCenter: { value: 1 },
         uVelocity: { value: 0 },
       },
       transparent: true,
@@ -239,29 +241,26 @@ const buildRows = async () => {
       const trackX = (((baseX[i]! + rowOffsets[r]!) % ROW_WIDTH) + ROW_WIDTH) % ROW_WIDTH
       const xPos = trackX - ROW_WIDTH / 2
 
-      const halfWidth = ROW_WIDTH / 2
-      const t = Math.min(Math.max((xPos + halfWidth) / ROW_WIDTH, 0.0), 1.0)
-
       const isTop = r === 0
       const sign = isTop ? 1.0 : -1.0
 
       m.position.x = xPos
 
-      const tu = (t - TOP_PEAK) / TOP_WIDTH
+      // Trayectoria cónica continua Contra:
+      // Sector izquierdo (x < 0): apertura suave en Y, avance en Z hacia la cámara, pitch y yaw hacia adentro
+      // Sector derecho (x >= 0): estabilización horizontal paralela para enmarcar el texto
+      const openFactor = 1.0 / (1.0 + Math.exp(K_Y * (xPos - X_MID)))
 
-      const inBump = tu > -1.0 && tu < 1.0
+      m.position.y = sign * (Y_BASE + Y_AMP * openFactor)
+      m.position.z = Z_FRONT * openFactor - Z_BACK * (1.0 - openFactor)
 
-      const spread = inBump ? TOP_AMP * 0.5 * (1.0 + Math.cos(Math.PI * tu)) : 0
-      m.position.y = sign * (0.7 + spread)
+      // Rotación 3D compuesta
+      m.rotation.x = -sign * PITCH_MAX * openFactor
+      m.rotation.y = YAW_MAX * openFactor
 
-      m.position.z = ROW_Z
-
-      m.rotation.x = 0
-      m.rotation.y = 0
-      const slope = inBump
-        ? -((TOP_AMP * Math.PI) / (2 * TOP_WIDTH * ROW_WIDTH)) * Math.sin(Math.PI * tu)
-        : 0
-      m.rotation.z = isTop ? slope : -slope
+      // Roll: inclinación tangencial a lo largo de la derivada dY/dx
+      const dYdx = -sign * Y_AMP * K_Y * openFactor * (1.0 - openFactor)
+      m.rotation.z = Math.atan2(dYdx, 1.0)
     }
 
     let opacity: number
