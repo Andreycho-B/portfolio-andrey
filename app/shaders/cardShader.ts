@@ -1,4 +1,5 @@
 export const cardVertexShader = /* glsl */ `
+  uniform float uIsTape;
   varying vec2 vUv;
   varying float vWorldX;
 
@@ -6,8 +7,10 @@ export const cardVertexShader = /* glsl */ `
     vUv = uv;
     vec3 pos = position;
 
-    // Doblado cilíndrico local sutil en la tarjeta
-    pos.z -= pow(pos.x, 2.0) * 0.08;
+    // Doblado cilíndrico local sutil en la tarjeta (la cinta permanece plana)
+    if (uIsTape < 0.5) {
+      pos.z -= pow(pos.x, 2.0) * 0.08;
+    }
 
     vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
     vWorldX = worldPosition.x;
@@ -29,6 +32,7 @@ export const cardFragmentShader = /* glsl */ `
   uniform vec3 uColor;
   uniform float uRadius;
   uniform float uOpacity;
+  uniform float uIsTape;
   uniform sampler2D uTexture;
   uniform float uCardAspect;
   uniform float uTextureAspect;
@@ -45,13 +49,14 @@ export const cardFragmentShader = /* glsl */ `
   }
 
   void main() {
-    vec2 p = vUv - 0.5;
-    vec2 halfSize = vec2(0.5);
-    float radius = uRadius;
-    float dist = roundedBoxSDF(p, halfSize, radius);
-
-    float aa = fwidth(dist) * 1.5;
-    float alpha = 1.0 - smoothstep(-aa, aa, dist);
+    float alpha = 1.0;
+    if (uIsTape < 0.5) {
+      vec2 p = vUv - 0.5;
+      vec2 halfSize = vec2(0.5);
+      float dist = roundedBoxSDF(p, halfSize, uRadius);
+      float aa = fwidth(dist) * 1.5;
+      alpha = 1.0 - smoothstep(-aa, aa, dist);
+    }
 
     // Fade horizontal de bordes: las tarjetas se disuelven al entrar/salir del viewport
     float edgeFade = 1.0;
@@ -61,7 +66,7 @@ export const cardFragmentShader = /* glsl */ `
 
     vec3 color = uColor;
 
-    if (uHasTexture > 0.5) {
+    if (uIsTape < 0.5 && uHasTexture > 0.5) {
       float cardAspect = uCardAspect;
       float texAspect = uTextureAspect;
 

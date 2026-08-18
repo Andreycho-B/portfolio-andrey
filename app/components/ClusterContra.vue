@@ -3,14 +3,22 @@ import * as THREE from 'three'
 import { cardVertexShader, cardFragmentShader } from '~/shaders/cardShader'
 import type { SceneContext } from '~/components/WebGLScene.vue'
 
-const CARD_SIZE = 0.85
+const CARD_WIDTH = 1.35
+const CARD_HEIGHT = 0.85
 const CARD_SEGMENTS = 16
-const SPACING = 0.95
+const SPACING = 1.55
 const ROW_Y = 0.95
 const ROW_Z = 0
 const CORNER_RADIUS_PX = 8
 const FADE_EDGE_IN = 0.88
 const FADE_EDGE_OUT = 1.0
+
+// Cinta que une las tarjetas siguiendo la misma curvatura (como fotografías pegadas en una tira)
+const TAPE_HEIGHT = 0.45
+const TAPE_Z_OFFSET = 0.03
+const TAPE_COLOR = 0x0f0f18
+const TAPE_OPACITY = 0.75
+const TAPE_SAMPLE_STEP = 0.05
 
 // Parámetros de la trayectoria cónica 3D continua "Contra" (Calibración Loop 2)
 const Y_BASE = 0.82
@@ -68,6 +76,9 @@ const baseX: number[] = []
 const rowIndexes: number[] = []
 
 let sharedGeometry: THREE.PlaneGeometry | null = null
+let tapeMaterial: THREE.ShaderMaterial | null = null
+const tapeMeshes: THREE.Mesh[] = []
+const tapeGeometries: THREE.BufferGeometry[] = []
 
 let renderCallback: ((deltaTime: number, elapsedTime: number) => void) | null = null
 
@@ -117,13 +128,17 @@ const applyScrollImpulse = (imp: number) => {
 const applyCornerRadius = (viewportWidth: number, viewportHeight: number) => {
   const cam = props.ctx.camera
   const dist = cam.position.z - ROW_Z
-  const projectedSize = (CARD_SIZE / dist) * (viewportHeight / (2 * Math.tan((cam.fov * Math.PI) / 360)))
+  const projectedSize = (CARD_HEIGHT / dist) * (viewportHeight / (2 * Math.tan((cam.fov * Math.PI) / 360)))
   const radius = Math.min(CORNER_RADIUS_PX / projectedSize, 0.5)
   const halfW = cam.position.z * Math.tan((cam.fov * Math.PI) / 360) * (viewportWidth / viewportHeight)
   fadeEdges.set(-halfW * FADE_EDGE_OUT, -halfW * FADE_EDGE_IN, halfW * FADE_EDGE_IN, halfW * FADE_EDGE_OUT)
   for (const material of materials) {
     material.uniforms.uRadius!.value = radius
     material.uniforms.uFadeEdges!.value.copy(fadeEdges)
+  }
+  if (tapeMaterial) {
+    tapeMaterial.uniforms.uRadius!.value = radius
+    tapeMaterial.uniforms.uFadeEdges!.value.copy(fadeEdges)
   }
 }
 
@@ -149,8 +164,70 @@ const loadTexture = async (url: string) => {
   }
 }
 
+// Espaciado compensado por profundidad: el hueco entre bordes de tarjetas vecinas
+// crece con z_view(x) para que el espacio proyectado sea uniforme en pantalla
+const buildBaseX = () => {
+  const camZ = props.ctx.camera.position.z
+  const half = (CARDS_PER_ROW * SPACING) / 2
+  let gap = 0.05
+  for (let iter = 0; iter < 10; iter++) {
+    const xs: number[] = [-half]
+    for (let i = 1; i < CARDS_PER_ROW; i++) {
+      const prev = xs[i - 1]!
+      const openFactor = 1.0 / (1.0 + Math.exp(K_Y * (prev - X_MID)))
+      const zWorld = Z_FRONT * openFactor - Z_BACK * (1.0 - openFactor)
+      xs.push(prev + CARD_WIDTH + gap * (camZ - zWorld))
+    }
+    gap *= ROW_WIDTH / (xs[CARDS_PER_ROW - 1]! - xs[0]!)
+  }
+  const xs: number[] = [-half]
+  for (let i = 1; i < CARDS_PER_ROW; i++) {
+    const prev = xs[i - 1]!
+    const openFactor = 1.0 / (1.0 + Math.exp(K_Y * (prev - X_MID)))
+    const zWorld = Z_FRONT * openFactor - Z_BACK * (1.0 - openFactor)
+    xs.push(prev + CARD_WIDTH + gap * (camZ - zWorld))
+  }
+  return xs
+}
+
+const buildTapeGeometry = (sign: number) => {
+  const half = ROW_WIDTH / 2 + 1.5
+  const samples = Math.ceil((half * 2) / TAPE_SAMPLE_STEP)
+  const positions: number[] = []
+  const uvs: number[] = []
+  const indices: number[] = []
+  const up = new THREE.Vector3()
+  const euler = new THREE.Euler()
+
+  for (let s = 0; s <= samples; s++) {
+    const x = -half + s * TAPE_SAMPLE_STEP
+    const openFactor = 1.0 / (1.0 + Math.exp(K_Y * (x - X_MID)))
+    const centerY = sign * (Y_BASE + Y_AMP * openFactor)
+    const centerZ = Z_FRONT * openFactor - Z_BACK * (1.0 - openFactor) - TAPE_Z_OFFSET
+    const dYdx = -sign * Y_AMP * K_Y * openFactor * (1.0 - openFactor)
+    euler.set(-sign * PITCH_MAX * openFactor, YAW_MAX * openFactor, Math.atan2(dYdx, 1.0), 'XYZ')
+    up.set(0, 1, 0).applyEuler(euler)
+
+    const v = s * 2
+    positions.push(x, centerY + up.y * (TAPE_HEIGHT / 2), centerZ + up.z * (TAPE_HEIGHT / 2))
+    positions.push(x, centerY - up.y * (TAPE_HEIGHT / 2), centerZ - up.z * (TAPE_HEIGHT / 2))
+    uvs.push(s / samples, 1, s / samples, 0)
+    if (s < samples) {
+      const n = v + 2
+      indices.push(v, n, v + 1, v + 1, n, n + 1)
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  return geometry
+}
+
 const buildRows = async () => {
-  const geometry = new THREE.PlaneGeometry(CARD_SIZE, CARD_SIZE, CARD_SEGMENTS, CARD_SEGMENTS)
+  const geometry = new THREE.PlaneGeometry(CARD_WIDTH, CARD_HEIGHT, CARD_SEGMENTS, CARD_SEGMENTS)
   sharedGeometry = geometry
   const texInfos = await Promise.all(PROJECTS.map(loadTexture))
   if (disposed) {
@@ -163,7 +240,8 @@ const buildRows = async () => {
       vertexShader: cardVertexShader,
       fragmentShader: cardFragmentShader,
       uniforms: {
-        uCardAspect: { value: 1.0 },
+        uIsTape: { value: 0.0 },
+        uCardAspect: { value: CARD_WIDTH / CARD_HEIGHT },
         uColor: { value: new THREE.Color(0x1a1a2e) },
         uRadius: { value: 0 },
         uOpacity: { value: 0 },
@@ -185,8 +263,35 @@ const buildRows = async () => {
     materials.push(material)
   }
 
+  tapeMaterial = new THREE.ShaderMaterial({
+    vertexShader: cardVertexShader,
+    fragmentShader: cardFragmentShader,
+    uniforms: {
+      uIsTape: { value: 1.0 },
+      uCardAspect: { value: 1.0 },
+      uColor: { value: new THREE.Color(TAPE_COLOR) },
+      uRadius: { value: 0 },
+      uOpacity: { value: 0 },
+      uTexture: { value: new THREE.Texture() },
+      uTextureAspect: { value: 1.0 },
+      uHasTexture: { value: 0.0 },
+      uFadeEdges: { value: fadeEdges.clone() },
+      uVelocity: { value: 0 },
+    },
+    transparent: true,
+  })
+  for (let r = 0; r < ROW_COUNT; r++) {
+    const tapeGeometry = buildTapeGeometry(r === 0 ? 1 : -1)
+    const tapeMesh = new THREE.Mesh(tapeGeometry, tapeMaterial)
+    props.ctx.scene.add(tapeMesh)
+    tapeGeometries.push(tapeGeometry)
+    tapeMeshes.push(tapeMesh)
+  }
+
   applyCornerRadius(window.innerWidth, window.innerHeight)
   props.ctx.registerResizeCallback(onResize)
+
+  const rowXs = buildBaseX()
 
   for (let i = 0; i < CARD_COUNT; i++) {
     const row = Math.floor(i / CARDS_PER_ROW)
@@ -196,8 +301,7 @@ const buildRows = async () => {
     mesh.visible = false
     props.ctx.scene.add(mesh)
     meshes.push(mesh)
-    const bx = col * SPACING - ROW_WIDTH / 2
-    baseX.push(bx)
+    baseX.push(rowXs[col]!)
     rowIndexes.push(row)
   }
 
@@ -280,6 +384,9 @@ const buildRows = async () => {
     for (const material of materials) {
       material.uniforms.uOpacity!.value = opacity
     }
+    if (tapeMaterial) {
+      tapeMaterial.uniforms.uOpacity!.value = opacity * TAPE_OPACITY
+    }
   }
 
   for (const mesh of meshes) mesh.visible = true
@@ -312,6 +419,16 @@ onBeforeUnmount(() => {
   for (const mesh of meshes) {
     props.ctx.scene.remove(mesh)
   }
+  for (const mesh of tapeMeshes) {
+    props.ctx.scene.remove(mesh)
+  }
+  for (const geometry of tapeGeometries) {
+    geometry.dispose()
+  }
+  tapeMeshes.length = 0
+  tapeGeometries.length = 0
+  tapeMaterial?.dispose()
+  tapeMaterial = null
   for (const material of materials) {
     material.uniforms.uTexture!.value.dispose()
     material.dispose()

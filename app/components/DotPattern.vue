@@ -1,40 +1,37 @@
 <script setup lang="ts">
-// Fondo de puntos decorativo (adaptación de MagicUI "Dot Pattern", 21st.dev/designali-in).
-// Sin Tailwind ni dependencias: SVG nativo con <pattern> y máscara radial en CSS.
-// El patrón se disuelve desde el centro de la mitad izquierda de la pantalla (20% del ancho, 50% del alto),
-// extendido hacia la derecha: la elipse horizontal llega a desvanecerse más cerca del borde derecho (hasta ~65% del ancho).
-const GRID_SIZE = 24
-const DOT_X = 1
-const DOT_Y = 1
-const DOT_RADIUS = 1.5
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import ConstellationGrid from './ConstellationGrid.vue'
+
+// punto fijo del clúster: centro de la máscara elíptica (20 % ancho / 50 % alto)
+const ANCHOR = [0.2, 0.5] as const
+
+// Mobile: clúster compacto (radio y zona de anillos/etiquetas escalados) para que
+// el efecto quede contenido en la zona visible de la máscara sin robar protagonismo.
+const isCompact = ref(false)
+let mq: MediaQueryList | null = null
+
+const handleMqChange = (e: MediaQueryListEvent) => {
+  isCompact.value = e.matches
+}
+
+onMounted(() => {
+  mq = window.matchMedia('(max-width: 640px)')
+  isCompact.value = mq.matches
+  mq.addEventListener('change', handleMqChange)
+})
+
+onBeforeUnmount(() => {
+  mq?.removeEventListener('change', handleMqChange)
+})
 </script>
 
 <template>
-  <svg class="dot-pattern" aria-hidden="true">
-    <defs>
-      <pattern
-        id="dot-pattern-grid"
-        :width="GRID_SIZE"
-        :height="GRID_SIZE"
-        patternUnits="userSpaceOnUse"
-      >
-        <circle :cx="DOT_X" :cy="DOT_Y" :r="DOT_RADIUS" />
-      </pattern>
-    </defs>
-    <rect width="100%" height="100%" fill="url(#dot-pattern-grid)" />
-  </svg>
+  <ConstellationGrid class="dot-pattern" :anchor="ANCHOR" :compact="isCompact" />
 </template>
 
 <style scoped>
 .dot-pattern {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  color: #0000ff;
   opacity: 0.7;
-  fill: currentColor;
 
   /* Centro del patrón: centro de la mitad izquierda de la pantalla (20% del ancho, 50% del alto);
      elipse ampliada hacia la derecha (rx 45%) para que el fade llegue cerca del 65% del ancho.

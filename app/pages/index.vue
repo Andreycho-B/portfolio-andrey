@@ -41,44 +41,22 @@ const listLeaving = ref(false)
 const wordSubEl = ref<HTMLElement | null>(null)
 const wordMainEl = ref<HTMLElement | null>(null)
 
-// Portada de entrada: el primer scroll entra con sonido (pad ambiental);
-// los enlaces de la portada permiten decidirlo explícitamente.
-const { start: startAudio } = useAmbientAudio()
-const introResolved = ref(false)
-let soundWanted = false
+const introVisible = ref(false)
+const introEntering = ref(true)
 
-const scrollToCarousel = () => {
-  window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })
+const dismissIntro = () => {
+  if (!introVisible.value) return
+  introVisible.value = false
+  introEntering.value = false
+  history.pushState({ view: 'portfolio' }, '', '/#work')
 }
 
-const enterWithSound = async () => {
-  if (introResolved.value) return
-  introResolved.value = true
-  soundWanted = true
-  await startAudio()
-  scrollToCarousel()
+const showIntro = () => {
+  introVisible.value = true
 }
 
-const enterSilent = () => {
-  if (introResolved.value) return
-  introResolved.value = true
-  soundWanted = false
-  scrollToCarousel()
-}
-
-const handleIntroScroll = () => {
-  if (introResolved.value) return
-  if (window.scrollY > 10) {
-    introResolved.value = true
-    soundWanted = true
-    void startAudio()
-  }
-}
-
-// Desbloqueo de autoplay: si se pidió sonido y el navegador suspendió el
-// contexto (p. ej. iOS), el primer toque/clic lo reactiva.
-const handlePointerUnlock = () => {
-  if (soundWanted) void startAudio()
+const handlePopState = (e: PopStateEvent) => {
+  introVisible.value = !e.state || e.state.view !== 'portfolio'
 }
 
 const layoutVertical = computed(() => mode.value === 'lista' && !listLeaving.value)
@@ -197,8 +175,8 @@ const handleMarqueeFaded = () => {
 }
 
 onMounted(() => {
-  window.addEventListener('scroll', handleIntroScroll, { passive: true })
-  window.addEventListener('pointerdown', handlePointerUnlock)
+  window.addEventListener('popstate', handlePopState)
+
   const timeout = setTimeout(() => {
     fontReady.value = true
   }, 1500)
@@ -208,11 +186,21 @@ onMounted(() => {
   }
   document.fonts.load('700 1em "Space Grotesk Variable"').then(markReady).catch(markReady)
   document.fonts.load('400 1em "Le Murmure"').then(markReady).catch(markReady)
+
+  // entrada fluida del gate en la carga: pinta oculto un frame y luego transiciona (misma curva que la vuelta);
+  // el carrusel (.page) permanece oculto durante la entrada para que la recarga inicie en pantalla blanca
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      introVisible.value = true
+      setTimeout(() => {
+        introEntering.value = false
+      }, 1950)
+    })
+  })
 })
 
 onUnmounted(() => {
-  window.removeEventListener('scroll', handleIntroScroll)
-  window.removeEventListener('pointerdown', handlePointerUnlock)
+  window.removeEventListener('popstate', handlePopState)
 })
 
 const handleSceneReady = (ctx: SceneContext) => {
@@ -226,8 +214,8 @@ const handleWebGLUnsupported = () => {
 
 <template>
   <main class="layout">
-    <IntroGate @enter="enterWithSound" @enter-silent="enterSilent" />
-    <div class="page">
+    <IntroGate :active="introVisible" :class="{ 'intro-gate--hidden': !introVisible }" @enter="dismissIntro" />
+    <div class="page" :class="{ 'page--hidden': introEntering }">
       <DotPattern />
       <WebGLScene
         v-if="webglSupported"
@@ -309,11 +297,9 @@ const handleWebGLUnsupported = () => {
 }
 
 .page {
-  position: sticky;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 100vh;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -324,6 +310,10 @@ const handleWebGLUnsupported = () => {
   padding: 0;
   user-select: none;
   -webkit-user-select: none;
+}
+
+.page--hidden {
+  visibility: hidden;
 }
 
 .overlay {
