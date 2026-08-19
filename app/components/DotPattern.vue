@@ -44,9 +44,9 @@ onBeforeUnmount(() => {
    a las tarjetas ni al texto vertical. */
 @media (width <= 640px) {
   .dot-pattern {
-    opacity: 0.5;
-    -webkit-mask-image: radial-gradient(ellipse 40% 50% at 20% 50%, #000 0%, transparent 80%);
-    mask-image: radial-gradient(ellipse 40% 50% at 20% 50%, #000 0%, transparent 80%);
+    opacity: 0.7;
+    -webkit-mask-image: radial-gradient(ellipse 45% 65% at 20% 50%, #000 0%, transparent 80%);
+    mask-image: radial-gradient(ellipse 45% 65% at 20% 50%, #000 0%, transparent 80%);
   }
 }
 </style>
