@@ -1,40 +1,16 @@
 <script setup lang="ts">
 import ConstellationGrid from './ConstellationGrid.vue'
-import LottieAnimation from './LottieAnimation.vue'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 defineProps<{ active?: boolean }>()
 defineEmits<{ enter: [] }>()
-
-// El botón de entrada aparece cuando la animación del saludo completa;
-// un watchdog evita que quede oculto si el JSON no carga.
-const WATCHDOG_MS = 6000
-const lottieDone = ref(false)
-let watchdog = 0
-
-onMounted(() => {
-  watchdog = window.setTimeout(() => {
-    lottieDone.value = true
-  }, WATCHDOG_MS)
-})
-
-onBeforeUnmount(() => {
-  window.clearTimeout(watchdog)
-})
 </script>
 
 <template>
   <section class="intro-gate">
     <ConstellationGrid :active="active" />
     <div class="intro-gate__content">
-      <LottieAnimation
-        class="intro-gate__lottie"
-        src="/lottie/intro.json"
-        @complete="lottieDone = true"
-      />
       <button
-        class="intro-gate__enter"
-        :class="{ 'intro-gate__enter--show': lottieDone }"
+        class="intro-gate__enter intro-gate__enter--show"
         type="button"
         @click="$emit('enter')"
       >
@@ -68,21 +44,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2.5rem;
-}
-
-.intro-gate__lottie {
-  width: min(560px, 84vw);
-  opacity: 0;
-  transform: translateY(14px);
-  transition:
-    opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.intro-gate__lottie--done {
-  opacity: 1;
-  transform: translateY(0);
 }
 
 .intro-gate--hidden {

@@ -17,11 +17,13 @@ const props = withDefaults(defineProps<{
   fov?: number
   cameraZ?: number
   cameraX?: number
+  paused?: boolean
 }>(), {
   clearColor: 0xffffff,
   fov: 75,
   cameraZ: 5,
   cameraX: 0,
+  paused: false,
 })
 
 const emit = defineEmits<{
@@ -37,6 +39,23 @@ let camera: THREE.PerspectiveCamera | null = null
 let timer: THREE.Timer | null = null
 let animationId: number | null = null
 let resizeObserver: ResizeObserver | null = null
+let softwareGL = false
+
+// Renderer por software (SwiftShader/llvmpipe: sin aceleración de GPU): se baja el
+// DPR a 0.5 y se alterna el render a 30 fps para que el carrusel siga fluido en CPU.
+const SOFTWARE_GL_PATTERN = /swiftshader|llvmpipe|software/i
+const SOFTWARE_PIXEL_RATIO = 0.5
+
+const isSoftwareRenderer = (renderer: THREE.WebGLRenderer) => {
+  try {
+    const gl = renderer.getContext()
+    const ext = gl.getExtension('WEBGL_debug_renderer_info')
+    if (!ext) return false
+    return SOFTWARE_GL_PATTERN.test(String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)))
+  } catch {
+    return false
+  }
+}
 
 const renderCallbacks: Array<(deltaTime: number, elapsedTime: number) => void> = []
 const resizeCallbacks: Array<(width: number, height: number) => void> = []
@@ -56,6 +75,44 @@ const unregisterResizeCallback = (cb: (width: number, height: number) => void) =
   if (idx > -1) resizeCallbacks.splice(idx, 1)
 }
 
+const animate = () => {
+  if (!timer || !renderer || !scene || !camera) return
+  timer.update()
+  const delta = Math.min(timer.getDelta(), 0.05)
+  const elapsed = timer.getElapsed()
+  for (const cb of renderCallbacks) cb(delta, elapsed)
+  renderSkip++
+  // En software render se alternan los frames (30 fps): la física y los callbacks
+  // siguen a 60 fps; solo el dibujado se intercala para liberar CPU.
+  if (!softwareGL || renderSkip % 2 === 0) renderer.render(scene, camera)
+  animationId = requestAnimationFrame(animate)
+}
+
+let renderSkip = 0
+
+const startLoop = () => {
+  if (props.paused) return
+  if (animationId !== null) return
+  animate()
+}
+
+const stopLoop = () => {
+  if (animationId !== null) {
+    cancelAnimationFrame(animationId)
+    animationId = null
+  }
+}
+
+// Pausa bajo demanda (p. ej. mientras la portada tapa la escena): el loop se
+// detiene para no robar frames; al reanudar el timer clampado evita el salto.
+watch(
+  () => props.paused,
+  (paused) => {
+    if (paused) stopLoop()
+    else startLoop()
+  },
+)
+
 const setupScene = () => {
   const canvas = canvasRef.value
   if (!canvas) return
@@ -70,7 +127,6 @@ const setupScene = () => {
 
   const width = parent.clientWidth
   const height = parent.clientHeight
-  const dpr = getDPR()
 
   scene = new THREE.Scene()
   camera = new THREE.PerspectiveCamera(props.fov, width / height, 0.1, 100)
@@ -85,7 +141,8 @@ const setupScene = () => {
     stencil: false,
     depth: true,
   })
-  renderer.setPixelRatio(dpr)
+  softwareGL = isSoftwareRenderer(renderer)
+  renderer.setPixelRatio(softwareGL ? SOFTWARE_PIXEL_RATIO : getDPR())
   renderer.setSize(width, height)
   // Fondo transparente: el blanco y el patrón de puntos los aporta el HTML de detrás (.page)
   renderer.setClearColor(props.clearColor, 0)
@@ -102,16 +159,7 @@ const setupScene = () => {
     unregisterResizeCallback,
   })
 
-  const animate = () => {
-    if (!timer || !renderer || !scene || !camera) return
-    timer.update()
-    const delta = Math.min(timer.getDelta(), 0.05)
-    const elapsed = timer.getElapsed()
-    for (const cb of renderCallbacks) cb(delta, elapsed)
-    renderer.render(scene, camera)
-    animationId = requestAnimationFrame(animate)
-  }
-  animate()
+  startLoop()
 
   const handleContextLost = (e: Event) => {
     e.preventDefault()
@@ -125,12 +173,12 @@ const setupScene = () => {
     if (!renderer || !scene || !camera || !timer) return
     // La restauración del contexto resetea el estado del renderer: se re-sincroniza
     // tamaño, pixel ratio, clear color y se reanuda el loop de animación
-    renderer.setPixelRatio(getDPR())
+    renderer.setPixelRatio(softwareGL ? SOFTWARE_PIXEL_RATIO : getDPR())
     renderer.setSize(parent.clientWidth, parent.clientHeight)
     renderer.setClearColor(props.clearColor, 0)
     handleResize()
     timer = new THREE.Timer()
-    animate()
+    startLoop()
   }
 
   canvas.addEventListener('webglcontextlost', handleContextLost)
@@ -151,6 +199,26 @@ const handleResize = () => {
   renderer.setSize(width, height)
   for (const cb of resizeCallbacks) cb(width, height)
 }
+
+// Pausa bajo demanda (p. ej. mientras la portada tapa la escena): el loop se
+// detiene para no robar frames; al reanudar el timer clampado evita el salto.
+watch(
+  () => props.paused,
+  (paused) => {
+    if (paused) {
+      if (animationId !== null) {
+        cancelAnimationFrame(animationId)
+        animationId = null
+      }
+    }
+    else if (!renderer) {
+      // la escena aún no existe: el guard de startLoop en setupScene lo aplicará
+    }
+    else {
+      animate()
+    }
+  },
+)
 
 const disposeAll = () => {
   if (animationId !== null) {
