@@ -5,9 +5,6 @@ import ConstellationGrid from './ConstellationGrid.vue'
 import { dotPatternVertexShader, dotPatternFragmentShader } from '~/shaders/dotPatternShader'
 import type { SceneContext } from '~/components/WebGLScene.vue'
 
-// Punto fijo del clúster: centro de la máscara elíptica (20 % ancho / 50 % alto)
-const ANCHOR = [0.2, 0.5] as const
-
 // Fracciones de la elipse replicadas del CSS (calibrables si el look no convence)
 const MASK_CENTER = new THREE.Vector2(0.2, 0.5)
 const MASK_RADII = new THREE.Vector2(0.45, 0.65)
@@ -17,7 +14,7 @@ const DOT_OPACITY = 0.7
 // El cuadro de fondo vive detrás de las tarjetas (la cámara mira hacia -Z desde cameraZ)
 const BG_Z = -2
 
-// Mobile: clúster compacto (radio y zona de anillos/etiquetas escalados) para que
+// Mobile: radio de interacción y zona de anillos/etiquetas escalados para que
 // el efecto quede contenido en la zona visible de la máscara sin robar protagonismo.
 const isCompact = ref(false)
 let mq: MediaQueryList | null = null
@@ -142,7 +139,7 @@ watch(
     ref="gridRef"
     class="dot-pattern"
     :class="{ 'dot-pattern--gl-hidden': glActive }"
-    :anchor="ANCHOR"
+    :flow="true"
     :compact="isCompact"
   />
 </template>
