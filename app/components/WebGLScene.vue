@@ -113,6 +113,29 @@ const setupScene = () => {
   }
   animate()
 
+  const handleContextLost = (e: Event) => {
+    e.preventDefault()
+    if (animationId !== null) {
+      cancelAnimationFrame(animationId)
+      animationId = null
+    }
+  }
+
+  const handleContextRestored = () => {
+    if (!renderer || !scene || !camera || !timer) return
+    // La restauración del contexto resetea el estado del renderer: se re-sincroniza
+    // tamaño, pixel ratio, clear color y se reanuda el loop de animación
+    renderer.setPixelRatio(getDPR())
+    renderer.setSize(parent.clientWidth, parent.clientHeight)
+    renderer.setClearColor(props.clearColor, 0)
+    handleResize()
+    timer = new THREE.Timer()
+    animate()
+  }
+
+  canvas.addEventListener('webglcontextlost', handleContextLost)
+  canvas.addEventListener('webglcontextrestored', handleContextRestored)
+
   resizeObserver = new ResizeObserver(() => handleResize())
   resizeObserver.observe(parent)
 }

@@ -28,6 +28,10 @@ useHead({
   ],
 })
 
+const FONT_READY_TIMEOUT = 1500
+const INTRO_ENTER_TIMEOUT = 1950
+const FLIP_CLEANUP_DELAY = 1250
+
 const webglSupported = ref(true)
 const sceneCtx = ref<SceneContext | null>(null)
 const fontReady = ref(false)
@@ -165,7 +169,7 @@ const flipWords = (entering: boolean, last: DOMRect[]) => {
       if (!moved) return
       flipCleanup = setTimeout(() => {
         els.forEach((el) => el.getAnimations().forEach((a) => a.cancel()))
-      }, 1250)
+      }, FLIP_CLEANUP_DELAY)
     })
   })
 }
@@ -179,7 +183,7 @@ onMounted(() => {
 
   const timeout = setTimeout(() => {
     fontReady.value = true
-  }, 1500)
+  }, FONT_READY_TIMEOUT)
   const markReady = () => {
     fontReady.value = true
     clearTimeout(timeout)
@@ -194,7 +198,7 @@ onMounted(() => {
       introVisible.value = true
       setTimeout(() => {
         introEntering.value = false
-      }, 1950)
+      }, INTRO_ENTER_TIMEOUT)
     })
   })
 })
@@ -215,8 +219,8 @@ const handleWebGLUnsupported = () => {
 <template>
   <main class="layout">
     <IntroGate :active="introVisible" :class="{ 'intro-gate--hidden': !introVisible }" @enter="dismissIntro" />
-    <div class="page" :class="{ 'page--hidden': introEntering }">
-      <DotPattern />
+<div class="page" :class="{ 'page--hidden': introEntering }">
+        <DotPattern :ctx="sceneCtx" />
       <WebGLScene
         v-if="webglSupported"
         :clear-color="0xffffff"

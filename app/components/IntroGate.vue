@@ -8,13 +8,14 @@ defineEmits<{ enter: [] }>()
 
 // El botón de entrada aparece cuando la animación del saludo completa;
 // un watchdog evita que quede oculto si el JSON no carga.
+const WATCHDOG_MS = 6000
 const lottieDone = ref(false)
 let watchdog = 0
 
 onMounted(() => {
   watchdog = window.setTimeout(() => {
     lottieDone.value = true
-  }, 6000)
+  }, WATCHDOG_MS)
 })
 
 onBeforeUnmount(() => {
@@ -88,8 +89,14 @@ onBeforeUnmount(() => {
   opacity: 0;
   transform: scale(0.98);
   pointer-events: none;
-  /* salida lenta: espejo temporal de la vuelta (asentamiento suave en ambas direcciones) */
-  transition-timing-function: cubic-bezier(0.64, 0, 0.78, 0);
+  /* al terminar la salida el panel sale del árbol de composición (evita una capa
+     fullscreen transparente sobre el carrusel, que en algunos motores interfería
+     con las capas de debajo) */
+  visibility: hidden;
+  transition:
+    opacity 1.8s cubic-bezier(0.64, 0, 0.78, 0),
+    transform 1.8s cubic-bezier(0.64, 0, 0.78, 0),
+    visibility 0s linear 1.9s;
 }
 
 /* los puntos se retiran rápido al salir; el panel blanco continúa su asentamiento lento */
