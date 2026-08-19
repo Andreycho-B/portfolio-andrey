@@ -119,7 +119,9 @@ const handleResize = () => {
   canvas.height = height * dpr
   canvas.style.width = `${width}px`
   canvas.style.height = `${height}px`
-  ctx.scale(dpr, dpr)
+  // setTransform (no scale): reasignar canvas.width resetea el transform y scale
+  // acumularía el factor DPR en cada resize
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   if (props.anchor) {
     mouse.x = props.anchor[0] * width
     mouse.y = props.anchor[1] * height

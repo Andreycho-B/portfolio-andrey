@@ -7,7 +7,8 @@ Portafolio personal de Andrey Rondón. Sitio estático generado con Nuxt 4 y Vue
 - Nuxt 4 (modo SSG / `generate`)
 - Vue 3 + TypeScript
 - three.js (render WebGL directo)
-- nuxt-security (headers + SRI)
+- lottie-web (saludo animado de la portada)
+- nuxt-security (headers de seguridad; CSP aplicada por `vercel.json`)
 - pnpm
 
 ## Scripts
@@ -24,15 +25,21 @@ pnpm typecheck        # Verificación de tipos (vue-tsc)
 
 ```
 app/
-  app.vue                    # Componente raíz (favicon, viewport)
-  pages/index.vue            # Overlay HTML: modo lista ✦ carrusel con FLIP, proyectos
-  components/WebGLScene.vue  # Escena THREE reutilizable (SceneContext)
-  components/ClusterContra.vue # Marquee WebGL: 32 tarjetas con curva Contra
+  app.vue                    # Componente raíz (favicon, viewport, reset)
+  pages/index.vue            # Overlay HTML: portada + modo lista ✦ carrusel con FLIP, proyectos
+  components/WebGLScene.vue  # Escena THREE reutilizable (SceneContext, context lost/restored)
+  components/ClusterContra.vue # Marquee WebGL: 32 tarjetas con curva Contra + cinta
+  components/ConstellationGrid.vue # Fondo de constelación (canvas 2D, física de nodos)
+  components/DotPattern.vue  # Fondo de puntos detrás del carrusel (espejo WebGL del canvas 2D)
+  components/IntroGate.vue   # Portada: ConstellationGrid + saludo Lottie + botón enter
+  components/LottieAnimation.vue # Carga lottie-web (solo cliente, renderer SVG)
   composables/useWebGLTier.ts  # Detección WebGL y DPR
   shaders/cardShader.ts       # Shaders GLSL (doblado, fade de bordes, blur)
+  shaders/dotPatternShader.ts # Shader del fondo de puntos (máscara elíptica)
 public/
   fonts/                     # Space Grotesk Variable + Le Murmure (woff2)
   images/projects/           # Texturas de las tarjetas (webp)
+  lottie/                    # intro.json (saludo de la portada)
 .github/workflows/           # CI: build (generate) + security (audit, semgrep)
 nuxt.config.ts               # Configuración Nuxt
 vercel.json                  # Headers de seguridad (CSP, HSTS, …)
