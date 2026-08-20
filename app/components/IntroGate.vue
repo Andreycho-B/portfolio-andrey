@@ -42,6 +42,13 @@ const onClick = () => {
 </template>
 
 <style scoped>
+@font-face {
+  font-family: 'Space Grotesk Variable';
+  src: url('/fonts/space-grotesk-variable.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
 .intro-gate {
   position: fixed;
   inset: 0;
