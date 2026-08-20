@@ -114,7 +114,7 @@ onUnmounted(() => {
           :ctx="sceneCtx"
           name="AI ESTANDAR"
           index="01 — 2025"
-          color="#1d4ed8"
+          color="#0066ff"
         />
       </WebGLScene>
 
