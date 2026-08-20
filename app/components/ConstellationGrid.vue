@@ -54,10 +54,9 @@ const WHEEL_SCALE = 16
 const BG_COLOR = '#ffffff'
 const NODE_RGB = '0, 102, 255'
 const ACCENT_RGB = '0, 102, 255'
-// líneas perezosas: sin cursor ni nodos en movimiento se dibujan intercaladas
-// (la constelación está estática; el resultado visual es idéntico)
-const LINES_IDLE_INTERVAL = 6
-// celda del hash espacial: igual a la distancia máxima de conexión
+// capa de lineas: se dibuja solo cuando cambian (cursor activo, nodos en
+// movimiento o dirty tras resize/tier); en reposo persiste del ultimo frame,
+// sin parpadeo ni re-dibujo (el canvas de nodos se limpia aparte, arriba)
 const CELL_SIZE = MAX_CONN_DIST
 // tier dinámico: si el frame se sostiene lento (ahorro de batería, gama media),
 // se baja la carga (DPR y densidad de la malla); se recupera al volver la fluidez
@@ -73,17 +72,19 @@ const props = withDefaults(
 )
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const lineRef = ref<HTMLCanvasElement | null>(null)
 
 let animationFrameId = 0
 let running = false
 let width = 0
 let height = 0
 let ctx: CanvasRenderingContext2D | null = null
+let lineCtx: CanvasRenderingContext2D | null = null
 let nodes: Node[] = []
 let lastTime = performance.now()
 let flowVel = 0
 let lastTouchY = 0
-let linesFrame = 0
+let linesDirty = true
 let tier = 0
 let tierTimer = 0
 let frameEMA = 0.016
@@ -134,7 +135,8 @@ const initNodes = (spacing = SPACING) => {
 
 const handleResize = () => {
   const canvas = canvasRef.value
-  if (!canvas || !ctx) return
+  const lineCanvas = lineRef.value
+  if (!canvas || !ctx || !lineCanvas || !lineCtx) return
   const dpr = tier === 1 ? LIGHT_DPR : getDPR()
   width = window.innerWidth
   height = window.innerHeight
@@ -142,9 +144,17 @@ const handleResize = () => {
   canvas.height = height * dpr
   canvas.style.width = `${width}px`
   canvas.style.height = `${height}px`
+  lineCanvas.width = width * dpr
+  lineCanvas.height = height * dpr
+  lineCanvas.style.width = `${width}px`
+  lineCanvas.style.height = `${height}px`
   // setTransform (no scale): reasignar canvas.width resetea el transform y scale
   // acumularía el factor DPR en cada resize
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  lineCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  lineCtx.fillStyle = BG_COLOR
+  lineCtx.fillRect(0, 0, width, height)
+  linesDirty = true
   if (props.anchor) {
     mouse.x = props.anchor[0] * width
     mouse.y = props.anchor[1] * height
@@ -158,7 +168,8 @@ const applyTier = (next: number) => {
   if (tier === next) return
   tier = next
   const canvas = canvasRef.value
-  if (!canvas || !ctx) return
+  const lineCanvas = lineRef.value
+  if (!canvas || !ctx || !lineCanvas || !lineCtx) return
   const dpr = tier === 1 ? LIGHT_DPR : getDPR()
   width = window.innerWidth
   height = window.innerHeight
@@ -166,7 +177,15 @@ const applyTier = (next: number) => {
   canvas.height = height * dpr
   canvas.style.width = `${width}px`
   canvas.style.height = `${height}px`
+  lineCanvas.width = width * dpr
+  lineCanvas.height = height * dpr
+  lineCanvas.style.width = `${width}px`
+  lineCanvas.style.height = `${height}px`
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  lineCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  lineCtx.fillStyle = BG_COLOR
+  lineCtx.fillRect(0, 0, width, height)
+  linesDirty = true
   initNodes(tier === 1 ? LIGHT_SPACING : SPACING)
 }
 
@@ -292,8 +311,9 @@ const render = (now: number) => {
   const attractPull = props.compact ? COMPACT_ATTRACT_PULL : ATTRACT_PULL
   const repelPull = props.compact ? COMPACT_REPEL_PULL : REPEL_PULL
 
-  ctx.fillStyle = BG_COLOR
-  ctx.fillRect(0, 0, width, height)
+  // el fondo blanco lo pinta la capa de líneas (persiste entre frames); la capa
+  // de nodos es transparente y se limpia cada frame
+  ctx.clearRect(0, 0, width, height)
 
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i]!
@@ -359,9 +379,8 @@ const render = (now: number) => {
     n.y += n.vy * dt * 60
   }
 
-  // líneas perezosas: sin cursor ni nodos en movimiento se dibujan intercaladas
-  // (la constelación está estática; el resultado visual es idéntico)
-  linesFrame++
+  // capa de líneas: se redibuja solo cuando cambian (cursor activo, nodos en
+  // movimiento o dirty tras resize/tier); en reposo persiste del último frame
   const cursorActivo = mouse.x > -1000 || cursor.x > -1000
   let moving = false
   if (!cursorActivo) {
@@ -373,7 +392,10 @@ const render = (now: number) => {
       }
     }
   }
-  if (cursorActivo || moving || linesFrame % LINES_IDLE_INTERVAL === 1) {
+  if (lineCtx && (cursorActivo || moving || linesDirty)) {
+    linesDirty = false
+    lineCtx.fillStyle = BG_COLOR
+    lineCtx.fillRect(0, 0, width, height)
     // hash espacial: solo se comparan nodos de celdas vecinas (pocos pares reales)
     // en vez del barrido completo O(n^2); el guard j > i evita pares duplicados
     const grid = new Map<string, number[]>()
@@ -412,12 +434,12 @@ const render = (now: number) => {
               const distSeg = Math.hypot(mouse.x - projX, mouse.y - projY)
               const lengthFade = 1 - Math.min(1, Math.max(0, (nDist - LEN_FADE_START) / (MAX_CONN_DIST - LEN_FADE_START))) * (1 - LEN_FADE_MIN)
               const alpha = 0.15 * Math.min(1, distSeg / (mouseRadius * LINE_FADE_RADIUS)) * lengthFade
-              ctx.strokeStyle = `rgba(${NODE_RGB}, ${alpha})`
-              ctx.lineWidth = 0.7
-              ctx.beginPath()
-              ctx.moveTo(n.x, n.y)
-              ctx.lineTo(n2.x, n2.y)
-              ctx.stroke()
+              lineCtx.strokeStyle = `rgba(${NODE_RGB}, ${alpha})`
+              lineCtx.lineWidth = 0.7
+              lineCtx.beginPath()
+              lineCtx.moveTo(n.x, n.y)
+              lineCtx.lineTo(n2.x, n2.y)
+              lineCtx.stroke()
             }
           }
         }
@@ -471,9 +493,11 @@ const stopLoop = () => {
 
 onMounted(() => {
   const canvas = canvasRef.value
-  if (!canvas) return
-  ctx = canvas.getContext('2d', { alpha: false })
-  if (!ctx) return
+  const lineCanvas = lineRef.value
+  if (!canvas || !lineCanvas) return
+  ctx = canvas.getContext('2d', { alpha: true })
+  lineCtx = lineCanvas.getContext('2d', { alpha: false })
+  if (!ctx || !lineCtx) return
   handleResize()
   window.addEventListener('resize', handleResize)
   window.addEventListener('mousemove', handleMouseMove)
@@ -508,10 +532,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <canvas ref="lineRef" class="constellation-lines" aria-hidden="true" />
   <canvas ref="canvasRef" class="constellation-grid" aria-hidden="true" />
 </template>
 
 <style scoped>
+.constellation-lines,
 .constellation-grid {
   position: absolute;
   inset: 0;
