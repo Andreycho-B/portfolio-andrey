@@ -141,9 +141,19 @@ const handleResize = () => {
 const handleMouseMove = (e: MouseEvent) => {
   cursor.x = e.clientX
   cursor.y = e.clientY
+  // primer contacto real: sincronizar el prev para que la velocidad calculada
+  // no explote por el salto desde la posición fantasma (-1000)
+  if (cursor.prevX === -1000) {
+    cursor.prevX = cursor.x
+    cursor.prevY = cursor.y
+  }
   if (!props.anchor) {
     mouse.x = cursor.x
     mouse.y = cursor.y
+    if (mouse.prevX === -1000) {
+      mouse.prevX = mouse.x
+      mouse.prevY = mouse.y
+    }
   }
 }
 
@@ -170,9 +180,15 @@ const handleTouchStart = (e: TouchEvent) => {
   lastTouchY = t.clientY
   cursor.x = t.clientX
   cursor.y = t.clientY
+  // el dedo aparece de golpe: el prev debe arrancar en la misma posición o la
+  // velocidad del primer frame explota (repulsión descontrolada, nodos dispersos)
+  cursor.prevX = cursor.x
+  cursor.prevY = cursor.y
   if (!props.anchor) {
     mouse.x = cursor.x
     mouse.y = cursor.y
+    mouse.prevX = mouse.x
+    mouse.prevY = mouse.y
   }
 }
 
