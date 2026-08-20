@@ -45,8 +45,8 @@ const FLOW_CAP = 70
 const FLOW_DECAY = 1.4
 const WHEEL_SCALE = 16
 const BG_COLOR = '#ffffff'
-const NODE_RGB = '0, 0, 255'
-const ACCENT_RGB = '0, 0, 255'
+const NODE_RGB = '0, 102, 255'
+const ACCENT_RGB = '0, 102, 255'
 
 const props = withDefaults(
   defineProps<{ active?: boolean; anchor?: readonly [number, number] | null; compact?: boolean }>(),
@@ -266,7 +266,12 @@ const render = (now: number) => {
       const distSq = ndx * ndx + ndy * ndy
       if (distSq < maxDistSq) {
         const nDist = Math.sqrt(distSq)
-        const alpha = (1 - nDist / MAX_CONN_DIST) * 0.14
+        // desvanecido uniforme: la línea se funde al acercarse al cursor y desaparece en su zona
+        const tSeg = Math.max(0, Math.min(1, ((mouse.x - n.x) * ndx + (mouse.y - n.y) * ndy) / Math.max(distSq, 1e-6)))
+        const projX = n.x + tSeg * ndx
+        const projY = n.y + tSeg * ndy
+        const distSeg = Math.hypot(mouse.x - projX, mouse.y - projY)
+        const alpha = 0.15 * Math.min(1, distSeg / mouseRadius)
         ctx.strokeStyle = `rgba(${NODE_RGB}, ${alpha})`
         ctx.lineWidth = 0.7
         ctx.beginPath()
@@ -284,7 +289,7 @@ const render = (now: number) => {
     const dist = Math.sqrt(dx * dx + dy * dy)
     const isNear = dist < mouseRadius
 
-    const baseAlpha = isNear ? 0.95 : 0.25 + Math.sin(n.pulse) * 0.1
+    const baseAlpha = 1
     ctx.fillStyle = isNear ? `rgba(${ACCENT_RGB}, ${baseAlpha})` : `rgba(${NODE_RGB}, ${baseAlpha})`
     const currentRadius = isNear ? n.radius * 2.2 : n.radius + Math.sin(n.pulse) * 0.3
     ctx.beginPath()

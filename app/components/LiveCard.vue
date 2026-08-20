@@ -24,7 +24,7 @@ const props = withDefaults(
     position?: [number, number, number]
   }>(),
   {
-    color: '#1d4ed8',
+    color: '#0066ff',
     position: () => [1.7, 0, 0],
   },
 )
@@ -113,7 +113,7 @@ const drawCard = (canvas: HTMLCanvasElement) => {
 
   // punto de acento azul eléctrico (identidad)
   ctx.save()
-  ctx.fillStyle = '#0000ff'
+  ctx.fillStyle = '#0066ff'
   ctx.beginPath()
   ctx.arc(CARD_W / 2, MARGIN + PHOTO_SIZE + 176, 5, 0, Math.PI * 2)
   ctx.fill()
