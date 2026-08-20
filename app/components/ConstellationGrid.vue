@@ -133,11 +133,14 @@ const initNodes = (spacing = SPACING) => {
   }
 }
 
-const handleResize = () => {
+const currentDpr = () => (tier === 1 ? LIGHT_DPR : getDPR())
+const currentSpacing = () => (tier === 1 ? LIGHT_SPACING : SPACING)
+
+// aplica tamaño + DPR a ambas capas, limpia la de líneas y la marca para redibujo
+const setupCanvas = (dpr: number) => {
   const canvas = canvasRef.value
   const lineCanvas = lineRef.value
   if (!canvas || !ctx || !lineCanvas || !lineCtx) return
-  const dpr = tier === 1 ? LIGHT_DPR : getDPR()
   width = window.innerWidth
   height = window.innerHeight
   canvas.width = width * dpr
@@ -155,38 +158,24 @@ const handleResize = () => {
   lineCtx.fillStyle = BG_COLOR
   lineCtx.fillRect(0, 0, width, height)
   linesDirty = true
+}
+
+const handleResize = () => {
+  setupCanvas(currentDpr())
   if (props.anchor) {
     mouse.x = props.anchor[0] * width
     mouse.y = props.anchor[1] * height
     mouse.prevX = mouse.x
     mouse.prevY = mouse.y
   }
-  initNodes(tier === 1 ? LIGHT_SPACING : SPACING)
+  initNodes(currentSpacing())
 }
 
 const applyTier = (next: number) => {
   if (tier === next) return
   tier = next
-  const canvas = canvasRef.value
-  const lineCanvas = lineRef.value
-  if (!canvas || !ctx || !lineCanvas || !lineCtx) return
-  const dpr = tier === 1 ? LIGHT_DPR : getDPR()
-  width = window.innerWidth
-  height = window.innerHeight
-  canvas.width = width * dpr
-  canvas.height = height * dpr
-  canvas.style.width = `${width}px`
-  canvas.style.height = `${height}px`
-  lineCanvas.width = width * dpr
-  lineCanvas.height = height * dpr
-  lineCanvas.style.width = `${width}px`
-  lineCanvas.style.height = `${height}px`
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  lineCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  lineCtx.fillStyle = BG_COLOR
-  lineCtx.fillRect(0, 0, width, height)
-  linesDirty = true
-  initNodes(tier === 1 ? LIGHT_SPACING : SPACING)
+  setupCanvas(currentDpr())
+  initNodes(currentSpacing())
 }
 
 const handleMouseMove = (e: MouseEvent) => {
