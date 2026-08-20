@@ -27,14 +27,18 @@ useHead({
   ],
 })
 
+const INTRO_ENTER_TIMEOUT = 1950
+
 const introVisible = ref(false)
+const introEntering = ref(true)
 const webglSupported = ref(true)
 const sceneCtx = ref<SceneContext | null>(null)
 
 const dismissIntro = () => {
   if (!introVisible.value) return
   introVisible.value = false
-  history.pushState({ view: 'portfolio' }, '', '/#work')
+  introEntering.value = false
+  history.pushState({ view: 'portfolio' }, '', location.pathname)
 }
 
 const showIntro = () => {
@@ -43,6 +47,14 @@ const showIntro = () => {
 
 const handlePopState = (e: PopStateEvent) => {
   introVisible.value = !e.state || e.state.view !== 'portfolio'
+}
+
+// back restaurado desde bfcache: Chrome no dispara popstate al volver entre
+// entradas con la misma URL; pageshow con persisted cubre ese caso
+const handlePageShow = (e: PageTransitionEvent) => {
+  if (e.persisted) {
+    introVisible.value = true
+  }
 }
 
 const handleSceneReady = (ctx: SceneContext) => {
@@ -55,18 +67,28 @@ const handleWebGLUnsupported = () => {
 
 onMounted(() => {
   window.addEventListener('popstate', handlePopState)
+  window.addEventListener('pageshow', handlePageShow)
+
+  // URL limpia: elimina cualquier hash heredado de enlaces viejos (/#work) sin tocar el historial
+  if (location.hash) {
+    history.replaceState(history.state, '', location.pathname + location.search)
+  }
 
   // entrada fluida del gate en la carga: pinta oculto un frame y luego transiciona (misma curva que la vuelta);
-  // la recarga inicia en pantalla blanca
+  // la escena (.page) permanece oculta durante la entrada para que la recarga inicie en pantalla blanca
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       introVisible.value = true
+      setTimeout(() => {
+        introEntering.value = false
+      }, INTRO_ENTER_TIMEOUT)
     })
   })
 })
 
 onUnmounted(() => {
   window.removeEventListener('popstate', handlePopState)
+  window.removeEventListener('pageshow', handlePageShow)
 })
 </script>
 
@@ -77,26 +99,28 @@ onUnmounted(() => {
       :class="{ 'intro-gate--hidden': !introVisible }"
       @enter="dismissIntro"
     />
-    <WebGLScene
-      v-if="webglSupported && !introVisible"
-      :clear-color="0xffffff"
-      :fov="72"
-      :camera-z="3.8"
-      :camera-x="0"
-      @webgl-unsupported="handleWebGLUnsupported"
-      @scene-ready="handleSceneReady"
-    >
-      <LiveCard
-        v-if="sceneCtx"
-        :ctx="sceneCtx"
-        name="AI ESTANDAR"
-        index="01 — 2025"
-        color="#1d4ed8"
-      />
-    </WebGLScene>
+    <div class="page" :class="{ 'page--hidden': introEntering }">
+      <WebGLScene
+        v-if="webglSupported && !introVisible"
+        :clear-color="0xffffff"
+        :fov="72"
+        :camera-z="3.8"
+        :camera-x="0"
+        @webgl-unsupported="handleWebGLUnsupported"
+        @scene-ready="handleSceneReady"
+      >
+        <LiveCard
+          v-if="sceneCtx"
+          :ctx="sceneCtx"
+          name="AI ESTANDAR"
+          index="01 — 2025"
+          color="#1d4ed8"
+        />
+      </WebGLScene>
 
-    <div v-if="!webglSupported" class="fallback">
-      <h1 class="portfolio-text">portfolio</h1>
+      <div v-if="!webglSupported" class="fallback">
+        <h1 class="portfolio-text">portfolio</h1>
+      </div>
     </div>
   </main>
 </template>
@@ -112,6 +136,18 @@ onUnmounted(() => {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+
+.page {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background-color: #ffffff;
+}
+
+.page--hidden {
+  visibility: hidden;
 }
 
 .fallback {
