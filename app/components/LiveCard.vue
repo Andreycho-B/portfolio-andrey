@@ -14,6 +14,8 @@ const RADIUS = 14
 const SHADOW_ALPHA = 0.09
 const SHADOW_BLUR = 28
 const SHADOW_OFFSET = 12
+const CARD_HALF_W = (CARD_W / CARD_H) * 1.7 / 2
+const EDGE_MARGIN = 0.1
 
 const props = withDefaults(
   defineProps<{
@@ -120,6 +122,17 @@ const drawCard = (canvas: HTMLCanvasElement) => {
   ctx.restore()
 }
 
+// en pantallas estrechas (portrait móvil/tablet) el ancho visible del mundo es menor
+// que la posición aprobada en desktop: la tarjeta se clampa al borde con margen.
+// Se recalcula en cada resize para seguir a la cámara real (fov/z/aspect)
+const reposition = () => {
+  const mesh = meshRef.value
+  const camera = props.ctx.camera
+  if (!mesh || !camera) return
+  const halfWidth = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.z * camera.aspect
+  mesh.position.x = Math.min(props.position[0], halfWidth - CARD_HALF_W - EDGE_MARGIN)
+}
+
 onMounted(async () => {
   try {
     await Promise.all([
@@ -148,10 +161,13 @@ onMounted(async () => {
   mesh.position.set(...props.position)
   props.ctx.scene.add(mesh)
   meshRef.value = mesh
+  reposition()
+  props.ctx.registerResizeCallback(reposition)
 })
 
 onBeforeUnmount(() => {
   disposed = true
+  props.ctx.unregisterResizeCallback(reposition)
   meshRef.value?.removeFromParent()
   geometry?.dispose()
   material?.dispose()
