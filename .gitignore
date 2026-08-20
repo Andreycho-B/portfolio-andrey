@@ -38,6 +38,8 @@ Thumbs.db
 # Test and coverage
 coverage
 *.test.log
+test-results/
+playwright-report/
 
 # Local references (capturas, mood board, notas locales)
 referencias/
@@ -57,5 +59,5 @@ referencias/
 # Onboarding del agente â€” no versionado (GIT-001)
 AGENTS.md
 
-# Espejo local del estándar AI Agent Engineering (no versionado)
+# Espejo local del estï¿½ndar AI Agent Engineering (no versionado)
 ai-agent-engineering-standard/

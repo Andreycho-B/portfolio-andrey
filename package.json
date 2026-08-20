@@ -7,6 +7,7 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "test:e2e": "playwright test",
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt typecheck"
   },
@@ -17,6 +18,7 @@
     "vue": "^3.5.40"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/three": "0.185.1",
     "typescript": "^5.9.3",
     "vue-tsc": "^3.3.9"

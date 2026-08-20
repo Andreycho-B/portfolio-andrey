@@ -7,8 +7,8 @@ Portafolio personal de Andrey Rondón. Sitio estático generado con Nuxt 4 y Vue
 - Nuxt 4 (modo SSG / `generate`)
 - Vue 3 + TypeScript
 - three.js (render WebGL directo)
-- lottie-web (saludo animado de la portada)
 - nuxt-security (headers de seguridad; CSP aplicada por `vercel.json`)
+- @playwright/test (suite e2e local, sin CI)
 - pnpm
 
 ## Scripts
@@ -19,6 +19,7 @@ pnpm dev              # Servidor de desarrollo en http://localhost:3000
 pnpm generate         # Build de producción (SSG) hacia .output/public/
 pnpm preview          # Previsualizar build de producción
 pnpm typecheck        # Verificación de tipos (vue-tsc)
+pnpm test:e2e         # Suite e2e (Playwright contra el build SSG)
 ```
 
 ## Estructura
@@ -26,20 +27,17 @@ pnpm typecheck        # Verificación de tipos (vue-tsc)
 ```
 app/
   app.vue                    # Componente raíz (favicon, viewport, reset)
-  pages/index.vue            # Overlay HTML: portada + modo lista ✦ carrusel con FLIP, proyectos
+  pages/index.vue            # Orquestación: IntroGate + WebGLScene con LiveCard
+  components/IntroGate.vue   # Portada: ConstellationGrid + botón "ingresar con sonido"
+  components/ConstellationGrid.vue # Fondo de constelación (canvas 2D, 2 capas, física de nodos)
   components/WebGLScene.vue  # Escena THREE reutilizable (SceneContext, context lost/restored)
-  components/ClusterContra.vue # Marquee WebGL: 32 tarjetas con curva Contra + cinta
-  components/ConstellationGrid.vue # Fondo de constelación (canvas 2D, física de nodos)
-  components/DotPattern.vue  # Fondo de puntos detrás del carrusel (espejo WebGL del canvas 2D)
-  components/IntroGate.vue   # Portada: ConstellationGrid + saludo Lottie + botón enter
-  components/LottieAnimation.vue # Carga lottie-web (solo cliente, renderer SVG)
+  components/LiveCard.vue    # Tarjeta polaroid en canvas 2D (CanvasTexture)
   composables/useWebGLTier.ts  # Detección WebGL y DPR
-  shaders/cardShader.ts       # Shaders GLSL (doblado, fade de bordes, blur)
-  shaders/dotPatternShader.ts # Shader del fondo de puntos (máscara elíptica)
 public/
   fonts/                     # Space Grotesk Variable + Le Murmure (woff2)
-  images/projects/           # Texturas de las tarjetas (webp)
-  lottie/                    # intro.json (saludo de la portada)
+  robots.txt
+tests/e2e/portfolio.spec.ts  # Suite Playwright: gate, escena, tarjeta, back-nav, mobile
+playwright.config.ts         # webServer: generate + preview (localhost:3000)
 .github/workflows/           # CI: build (generate) + security (audit, semgrep)
 nuxt.config.ts               # Configuración Nuxt
 vercel.json                  # Headers de seguridad (CSP, HSTS, …)
