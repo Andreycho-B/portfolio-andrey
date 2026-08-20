@@ -51,7 +51,6 @@ const FLOW_STRENGTH = 0.09
 const FLOW_CAP = 70
 const FLOW_DECAY = 1.4
 const WHEEL_SCALE = 16
-const BG_COLOR = '#ffffff'
 const NODE_RGB = '0, 102, 255'
 const ACCENT_RGB = '0, 102, 255'
 // capa de lineas: se dibuja solo cuando cambian (cursor activo, nodos en
@@ -155,8 +154,8 @@ const setupCanvas = (dpr: number) => {
   // acumularía el factor DPR en cada resize
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   lineCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  lineCtx.fillStyle = BG_COLOR
-  lineCtx.fillRect(0, 0, width, height)
+  // la capa de líneas es transparente: el fondo lo provee el contenedor (blanco)
+  lineCtx.clearRect(0, 0, width, height)
   linesDirty = true
 }
 
@@ -383,8 +382,7 @@ const render = (now: number) => {
   }
   if (lineCtx && (cursorActivo || moving || linesDirty)) {
     linesDirty = false
-    lineCtx.fillStyle = BG_COLOR
-    lineCtx.fillRect(0, 0, width, height)
+    lineCtx.clearRect(0, 0, width, height)
     // hash espacial: solo se comparan nodos de celdas vecinas (pocos pares reales)
     // en vez del barrido completo O(n^2); el guard j > i evita pares duplicados
     const grid = new Map<string, number[]>()
@@ -485,7 +483,7 @@ onMounted(() => {
   const lineCanvas = lineRef.value
   if (!canvas || !lineCanvas) return
   ctx = canvas.getContext('2d', { alpha: true })
-  lineCtx = lineCanvas.getContext('2d', { alpha: false })
+  lineCtx = lineCanvas.getContext('2d', { alpha: true })
   if (!ctx || !lineCtx) return
   handleResize()
   window.addEventListener('resize', handleResize)

@@ -2,7 +2,26 @@
 import ConstellationGrid from './ConstellationGrid.vue'
 
 defineProps<{ active?: boolean }>()
-defineEmits<{ enter: [] }>()
+const emit = defineEmits<{ enter: [] }>()
+
+// la salida se dispara en pointerup: en iOS, mantener el botón unos segundos
+// anula el click nativo (long-press) y sin esto no redirigiría
+let suppressClick = false
+
+const onPointerUp = () => {
+  suppressClick = true
+  emit('enter')
+}
+
+// el click solo dispara cuando no hubo pointer (teclado: a11y); el click del
+// navegador que sigue al pointerup ya fue cubierto por onPointerUp
+const onClick = () => {
+  if (suppressClick) {
+    suppressClick = false
+    return
+  }
+  emit('enter')
+}
 </script>
 
 <template>
@@ -12,9 +31,11 @@ defineEmits<{ enter: [] }>()
       <button
         class="intro-gate__enter intro-gate__enter--show"
         type="button"
-        @click="$emit('enter')"
+        @click="onClick"
+        @pointerup="onPointerUp"
+        @pointercancel="onPointerUp"
       >
-        enter
+        ingresar con sonido
       </button>
     </div>
   </section>
@@ -39,7 +60,11 @@ defineEmits<{ enter: [] }>()
 }
 
 .intro-gate__content {
-  position: relative;
+  /* el botón se centra en la mitad de la mitad inferior de la pantalla (75%) */
+  position: absolute;
+  top: 75%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   z-index: 1;
   display: flex;
   flex-direction: column;
@@ -60,10 +85,12 @@ defineEmits<{ enter: [] }>()
     visibility 0s linear 1.9s;
 }
 
-/* los puntos se retiran rápido al salir; el panel blanco continúa su asentamiento lento */
-.intro-gate--hidden .constellation-grid {
+/* los puntos y las líneas se retiran suave al salir, en ritmo con el texto y el
+   panel; :deep para que el selector no quede atado al data-v del hijo */
+.intro-gate--hidden :deep(.constellation-grid),
+.intro-gate--hidden :deep(.constellation-lines) {
   opacity: 0;
-  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .intro-gate__enter {
@@ -79,6 +106,9 @@ defineEmits<{ enter: [] }>()
   border: none;
   padding: 0.6em 1.2em;
   cursor: pointer;
+  /* el resaltado gris translúcido que iOS/Android pintan al tocar (el "recuadro"
+     que aparecía detrás de enter solo en mobile) */
+  -webkit-tap-highlight-color: transparent;
   opacity: 0;
   pointer-events: none;
   transform: translateY(6px);
@@ -95,18 +125,25 @@ defineEmits<{ enter: [] }>()
   transform: translateY(0);
 }
 
+/* el texto sale en el mismo ritmo que las partículas (0.6s, mismo easing):
+   desvanecimiento y ascenso sincronizados con la malla */
 .intro-gate--hidden .intro-gate__enter {
   opacity: 0;
   transform: translateY(-10px);
-  transition-delay: 0s;
-  transition-timing-function: cubic-bezier(0.64, 0, 0.78, 0);
+  transition-duration: 0.6s;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.intro-gate__enter:hover,
-.intro-gate__enter:focus-visible {
-  color: #15131a;
-  letter-spacing: 0.35em;
-  outline: none;
+/* hover real (desktop): el cambio de letter-spacing re-disponé el texto, por eso
+   se restringe a dispositivos con hover físico — el toque del móvil lo activaría
+   como sticky hover y partiría "ingresar con sonido" en dos líneas */
+@media (hover: hover) {
+  .intro-gate__enter:hover,
+  .intro-gate__enter:focus-visible {
+    color: #15131a;
+    letter-spacing: 0.35em;
+    outline: none;
+  }
 }
 
 /* área táctil mínima en móvil (recomendación 44px) */
