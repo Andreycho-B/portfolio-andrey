@@ -162,14 +162,43 @@ const handleWheel = (e: WheelEvent) => {
   flowVel += e.deltaY * (e.deltaMode === 1 ? WHEEL_SCALE : 1)
 }
 
+// el dedo actúa como el cursor: repulsión, fade de líneas, anillos y etiquetas
+// responden igual que con el mouse; al soltar, el cursor se retira (vuelven a casa)
 const handleTouchStart = (e: TouchEvent) => {
-  lastTouchY = e.touches[0]?.clientY ?? 0
+  const t = e.touches[0]
+  if (!t) return
+  lastTouchY = t.clientY
+  cursor.x = t.clientX
+  cursor.y = t.clientY
+  if (!props.anchor) {
+    mouse.x = cursor.x
+    mouse.y = cursor.y
+  }
 }
 
 const handleTouchMove = (e: TouchEvent) => {
-  const y = e.touches[0]?.clientY ?? 0
+  const t = e.touches[0]
+  if (!t) return
+  const y = t.clientY
   flowVel += (y - lastTouchY) * 1.5
   lastTouchY = y
+  cursor.x = t.clientX
+  cursor.y = t.clientY
+  if (!props.anchor) {
+    mouse.x = cursor.x
+    mouse.y = cursor.y
+  }
+}
+
+const handleTouchEnd = () => {
+  cursor.x = -1000
+  cursor.y = -1000
+  cursor.prevX = -1000
+  cursor.prevY = -1000
+  if (!props.anchor) {
+    mouse.x = -1000
+    mouse.y = -1000
+  }
 }
 
 const render = (now: number) => {
@@ -346,6 +375,8 @@ onMounted(() => {
   window.addEventListener('wheel', handleWheel, { passive: true })
   window.addEventListener('touchstart', handleTouchStart, { passive: true })
   window.addEventListener('touchmove', handleTouchMove, { passive: true })
+  window.addEventListener('touchend', handleTouchEnd, { passive: true })
+  window.addEventListener('touchcancel', handleTouchEnd, { passive: true })
   if (props.active !== false) startLoop()
 })
 
@@ -365,6 +396,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('wheel', handleWheel)
   window.removeEventListener('touchstart', handleTouchStart)
   window.removeEventListener('touchmove', handleTouchMove)
+  window.removeEventListener('touchend', handleTouchEnd)
+  window.removeEventListener('touchcancel', handleTouchEnd)
 })
 </script>
 
