@@ -12,19 +12,33 @@ interface Node {
   radius: number
   label: string
   pulse: number
+  orbit: number
+  offX: number
+  offY: number
 }
 
 const SPACING = 55
 const MAX_CONN_DIST = 75
-// alpha de conexiones reforzado (0.08 -> 0.14) para igualar la densidad del
-// demo oscuro de 21st.dev (referencia: daiv09/constellation-grid) en fondo blanco
-const CONN_ALPHA = 0.14
 const MOUSE_RADIUS = 220
 const COMPACT_MOUSE_RADIUS = 120
 const NEAR_ZONE = 90
 const COMPACT_NEAR_ZONE = 60
 const SPRING_K = 18
 const DAMPING = 0.82
+// velocidad angular de las órbitas: omega = ORBIT_SPEED / radio (los interiores giran más rápido)
+const ORBIT_SPEED = 90
+// atracción tipo agujero negro: acercamiento lento y fluido de los nodos al cursor
+const ATTRACT_RADIUS = 180
+const COMPACT_ATTRACT_RADIUS = 110
+const ATTRACT_PULL = 30
+const COMPACT_ATTRACT_PULL = 20
+const ATTRACT_EASE = 2.2
+// cursor lento atrae, cursor rápido repele: blend suave entre ambos umbrales
+const SLOW_SPEED = 100
+const FAST_SPEED = 500
+const REPEL_PULL = 60
+const COMPACT_REPEL_PULL = 40
+const REPEL_EASE_BONUS = 2
 // flujo por scroll: los nodos se desplazan con la velocidad y dirección del carrusel
 const FLOW_STRENGTH = 0.09
 const FLOW_CAP = 70
@@ -35,8 +49,8 @@ const NODE_RGB = '0, 0, 255'
 const ACCENT_RGB = '0, 0, 255'
 
 const props = withDefaults(
-  defineProps<{ active?: boolean; flow?: boolean; compact?: boolean }>(),
-  { active: true, flow: false, compact: false },
+  defineProps<{ active?: boolean; anchor?: readonly [number, number] | null; compact?: boolean }>(),
+  { active: true, anchor: null, compact: false },
 )
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -52,6 +66,15 @@ let flowVel = 0
 let lastTouchY = 0
 
 const mouse = {
+  x: -1000,
+  y: -1000,
+  prevX: -1000,
+  prevY: -1000,
+  vx: 0,
+  vy: 0,
+}
+
+const cursor = {
   x: -1000,
   y: -1000,
   prevX: -1000,
@@ -78,6 +101,9 @@ const initNodes = () => {
         radius: Math.random() * 1.2 + 1.2,
         label: `${(i * 7).toString(16).toUpperCase()}:${(j * 11).toString(16).toUpperCase()}`,
         pulse: Math.random() * Math.PI * 2,
+        orbit: Math.random() * Math.PI * 2,
+        offX: 0,
+        offY: 0,
       })
     }
   }
@@ -96,19 +122,33 @@ const handleResize = () => {
   // setTransform (no scale): reasignar canvas.width resetea el transform y scale
   // acumularía el factor DPR en cada resize
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  if (props.anchor) {
+    mouse.x = props.anchor[0] * width
+    mouse.y = props.anchor[1] * height
+    mouse.prevX = mouse.x
+    mouse.prevY = mouse.y
+  }
   initNodes()
 }
 
 const handleMouseMove = (e: MouseEvent) => {
-  mouse.x = e.clientX
-  mouse.y = e.clientY
+  cursor.x = e.clientX
+  cursor.y = e.clientY
+  if (!props.anchor) {
+    mouse.x = cursor.x
+    mouse.y = cursor.y
+  }
 }
 
 const handleMouseLeave = () => {
-  mouse.x = -1000
-  mouse.y = -1000
-  mouse.prevX = -1000
-  mouse.prevY = -1000
+  cursor.x = -1000
+  cursor.y = -1000
+  cursor.prevX = -1000
+  cursor.prevY = -1000
+  if (!props.anchor) {
+    mouse.x = -1000
+    mouse.y = -1000
+  }
 }
 
 const handleWheel = (e: WheelEvent) => {
@@ -135,22 +175,64 @@ const render = (now: number) => {
   mouse.prevX = mouse.x
   mouse.prevY = mouse.y
 
+  cursor.vx = (cursor.x - cursor.prevX) / (dt * 1000 || 1)
+  cursor.vy = (cursor.y - cursor.prevY) / (dt * 1000 || 1)
+  cursor.prevX = cursor.x
+  cursor.prevY = cursor.y
+
   flowVel *= Math.exp(-FLOW_DECAY * dt)
 
   const speed = Math.sqrt(mouse.vx * mouse.vx + mouse.vy * mouse.vy)
   const mouseRadius = props.compact ? COMPACT_MOUSE_RADIUS : MOUSE_RADIUS
   const nearZone = props.compact ? COMPACT_NEAR_ZONE : NEAR_ZONE
-  // el flujo de scroll desplaza los nodos con la velocidad y dirección del carrusel
-  const flowOffset = props.flow ? Math.max(-FLOW_CAP, Math.min(FLOW_CAP, flowVel * FLOW_STRENGTH)) : 0
+  const attractRadius = props.compact ? COMPACT_ATTRACT_RADIUS : ATTRACT_RADIUS
+  const attractPull = props.compact ? COMPACT_ATTRACT_PULL : ATTRACT_PULL
+  const repelPull = props.compact ? COMPACT_REPEL_PULL : REPEL_PULL
 
   ctx.fillStyle = BG_COLOR
   ctx.fillRect(0, 0, width, height)
 
-  // física del original (daiv09/constellation-grid): shockwave por velocidad del
-  // cursor + muelle de Hooke con amortiguación; los nodos descansan en su malla
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i]!
     n.pulse += dt * 3
+
+    // modo anclado: los nodos del clúster orbitan el centro como planetas;
+    // el resto descansa en su punto de malla
+    if (props.anchor) {
+      const orbitDist = Math.hypot(n.baseX - mouse.x, n.baseY - mouse.y)
+      if (orbitDist < mouseRadius && orbitDist > 0) {
+        n.orbit += (ORBIT_SPEED / orbitDist) * dt
+        n.x = mouse.x + Math.cos(n.orbit) * orbitDist
+        n.y = mouse.y + Math.sin(n.orbit) * orbitDist
+      } else {
+        n.x = n.baseX
+        n.y = n.baseY
+      }
+      // el cursor atrae al pasar lento y controlado (agujero negro) y repele al
+      // pasar rápido: blend suave entre ambos según la velocidad del cursor;
+      // el flujo de scroll desplaza los nodos con la velocidad y dirección del carrusel
+      const adx = cursor.x - n.x
+      const ady = cursor.y - n.y
+      const adist = Math.hypot(adx, ady)
+      const flowOffset = Math.max(-FLOW_CAP, Math.min(FLOW_CAP, flowVel * FLOW_STRENGTH))
+      if (adist < attractRadius && adist > 0) {
+        const cSpeed = Math.hypot(cursor.vx, cursor.vy)
+        const blend = Math.min(Math.max((cSpeed - SLOW_SPEED) / (FAST_SPEED - SLOW_SPEED), 0), 1)
+        const pull = (1 - adist / attractRadius) * (attractPull * (1 - blend) + repelPull * blend)
+        const dirX = (adx / adist) * (1 - 2 * blend)
+        const dirY = (ady / adist) * (1 - 2 * blend)
+        const ease = 1 - Math.exp(-(ATTRACT_EASE + blend * REPEL_EASE_BONUS) * dt)
+        n.offX += (dirX * pull + flowOffset - n.offX) * ease
+        n.offY += (dirY * pull - n.offY) * ease
+      } else {
+        const ease = 1 - Math.exp(-ATTRACT_EASE * dt)
+        n.offX += (flowOffset - n.offX) * ease
+        n.offY -= n.offY * ease
+      }
+      n.x += n.offX
+      n.y += n.offY
+      continue
+    }
 
     const dx = mouse.x - n.x
     const dy = mouse.y - n.y
@@ -170,7 +252,7 @@ const render = (now: number) => {
     n.vy += homeDy * SPRING_K * dt
     n.vx *= DAMPING
     n.vy *= DAMPING
-    n.x += n.vx * dt * 60 + flowOffset
+    n.x += n.vx * dt * 60
     n.y += n.vy * dt * 60
   }
 
@@ -184,7 +266,7 @@ const render = (now: number) => {
       const distSq = ndx * ndx + ndy * ndy
       if (distSq < maxDistSq) {
         const nDist = Math.sqrt(distSq)
-        const alpha = (1 - nDist / MAX_CONN_DIST) * CONN_ALPHA
+        const alpha = (1 - nDist / MAX_CONN_DIST) * 0.14
         ctx.strokeStyle = `rgba(${NODE_RGB}, ${alpha})`
         ctx.lineWidth = 0.7
         ctx.beginPath()
