@@ -103,16 +103,6 @@ const stopLoop = () => {
   }
 }
 
-// Pausa bajo demanda (p. ej. mientras la portada tapa la escena): el loop se
-// detiene para no robar frames; al reanudar el timer clampado evita el salto.
-watch(
-  () => props.paused,
-  (paused) => {
-    if (paused) stopLoop()
-    else startLoop()
-  },
-)
-
 const setupScene = () => {
   const canvas = canvasRef.value
   if (!canvas) return
