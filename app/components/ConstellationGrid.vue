@@ -54,6 +54,18 @@ const WHEEL_SCALE = 16
 const BG_COLOR = '#ffffff'
 const NODE_RGB = '0, 102, 255'
 const ACCENT_RGB = '0, 102, 255'
+// líneas perezosas: sin cursor ni nodos en movimiento se dibujan intercaladas
+// (la constelación está estática; el resultado visual es idéntico)
+const LINES_IDLE_INTERVAL = 6
+// celda del hash espacial: igual a la distancia máxima de conexión
+const CELL_SIZE = MAX_CONN_DIST
+// tier dinámico: si el frame se sostiene lento (ahorro de batería, gama media),
+// se baja la carga (DPR y densidad de la malla); se recupera al volver la fluidez
+const TIER_DOWN_FPS = 31
+const TIER_UP_FPS = 50
+const TIER_HYSTERESIS = 60
+const LIGHT_SPACING = 80
+const LIGHT_DPR = 1
 
 const props = withDefaults(
   defineProps<{ active?: boolean; anchor?: readonly [number, number] | null; compact?: boolean }>(),
@@ -71,6 +83,10 @@ let nodes: Node[] = []
 let lastTime = performance.now()
 let flowVel = 0
 let lastTouchY = 0
+let linesFrame = 0
+let tier = 0
+let tierTimer = 0
+let frameEMA = 0.016
 
 const mouse = {
   x: -1000,
@@ -90,14 +106,14 @@ const cursor = {
   vy: 0,
 }
 
-const initNodes = () => {
+const initNodes = (spacing = SPACING) => {
   nodes = []
-  const cols = Math.ceil(width / SPACING) + 1
-  const rows = Math.ceil(height / SPACING) + 1
+  const cols = Math.ceil(width / spacing) + 1
+  const rows = Math.ceil(height / spacing) + 1
   for (let i = 0; i < cols; i++) {
     for (let j = 0; j < rows; j++) {
-      const x = i * SPACING
-      const y = j * SPACING
+      const x = i * spacing
+      const y = j * spacing
       nodes.push({
         x,
         y,
@@ -119,7 +135,7 @@ const initNodes = () => {
 const handleResize = () => {
   const canvas = canvasRef.value
   if (!canvas || !ctx) return
-  const dpr = getDPR()
+  const dpr = tier === 1 ? LIGHT_DPR : getDPR()
   width = window.innerWidth
   height = window.innerHeight
   canvas.width = width * dpr
@@ -135,7 +151,23 @@ const handleResize = () => {
     mouse.prevX = mouse.x
     mouse.prevY = mouse.y
   }
-  initNodes()
+  initNodes(tier === 1 ? LIGHT_SPACING : SPACING)
+}
+
+const applyTier = (next: number) => {
+  if (tier === next) return
+  tier = next
+  const canvas = canvasRef.value
+  if (!canvas || !ctx) return
+  const dpr = tier === 1 ? LIGHT_DPR : getDPR()
+  width = window.innerWidth
+  height = window.innerHeight
+  canvas.width = width * dpr
+  canvas.height = height * dpr
+  canvas.style.width = `${width}px`
+  canvas.style.height = `${height}px`
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  initNodes(tier === 1 ? LIGHT_SPACING : SPACING)
 }
 
 const handleMouseMove = (e: MouseEvent) => {
@@ -221,6 +253,25 @@ const render = (now: number) => {
   if (!ctx) return
   const dt = Math.min((now - lastTime) / 1000, 0.05)
   lastTime = now
+
+  // tier dinámico: el frame time real (EMA) decide la carga; histéresis para no
+  // oscilar entre niveles (el ahorro de batería de iOS/Android baja el CPU y el rAF)
+  frameEMA += (dt - frameEMA) * 0.05
+  if (tier === 0 && frameEMA > 1 / TIER_DOWN_FPS) {
+    tierTimer++
+    if (tierTimer > TIER_HYSTERESIS) {
+      tierTimer = 0
+      applyTier(1)
+    }
+  } else if (tier === 1 && frameEMA < 1 / TIER_UP_FPS) {
+    tierTimer++
+    if (tierTimer > TIER_HYSTERESIS) {
+      tierTimer = 0
+      applyTier(0)
+    }
+  } else {
+    tierTimer = 0
+  }
 
   mouse.vx = (mouse.x - mouse.prevX) / (dt * 1000 || 1)
   mouse.vy = (mouse.y - mouse.prevY) / (dt * 1000 || 1)
@@ -308,29 +359,68 @@ const render = (now: number) => {
     n.y += n.vy * dt * 60
   }
 
-  const maxDistSq = MAX_CONN_DIST * MAX_CONN_DIST
-  for (let i = 0; i < nodes.length; i++) {
-    const n = nodes[i]!
-    for (let j = i + 1; j < nodes.length; j++) {
-      const n2 = nodes[j]!
-      const ndx = n.x - n2.x
-      const ndy = n.y - n2.y
-      const distSq = ndx * ndx + ndy * ndy
-      if (distSq < maxDistSq) {
-        const nDist = Math.sqrt(distSq)
-        // desvanecido uniforme: la línea se funde al acercarse al cursor y desaparece en su zona
-        const tSeg = Math.max(0, Math.min(1, ((mouse.x - n.x) * ndx + (mouse.y - n.y) * ndy) / Math.max(distSq, 1e-6)))
-        const projX = n.x + tSeg * ndx
-        const projY = n.y + tSeg * ndy
-        const distSeg = Math.hypot(mouse.x - projX, mouse.y - projY)
-        const lengthFade = 1 - Math.min(1, Math.max(0, (nDist - LEN_FADE_START) / (MAX_CONN_DIST - LEN_FADE_START))) * (1 - LEN_FADE_MIN)
-        const alpha = 0.15 * Math.min(1, distSeg / (mouseRadius * LINE_FADE_RADIUS)) * lengthFade
-        ctx.strokeStyle = `rgba(${NODE_RGB}, ${alpha})`
-        ctx.lineWidth = 0.7
-        ctx.beginPath()
-        ctx.moveTo(n.x, n.y)
-        ctx.lineTo(n2.x, n2.y)
-        ctx.stroke()
+  // líneas perezosas: sin cursor ni nodos en movimiento se dibujan intercaladas
+  // (la constelación está estática; el resultado visual es idéntico)
+  linesFrame++
+  const cursorActivo = mouse.x > -1000 || cursor.x > -1000
+  let moving = false
+  if (!cursorActivo) {
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i]!
+      if (Math.abs(n.x - n.baseX) > 1 || Math.abs(n.y - n.baseY) > 1) {
+        moving = true
+        break
+      }
+    }
+  }
+  if (cursorActivo || moving || linesFrame % LINES_IDLE_INTERVAL === 1) {
+    // hash espacial: solo se comparan nodos de celdas vecinas (pocos pares reales)
+    // en vez del barrido completo O(n^2); el guard j > i evita pares duplicados
+    const grid = new Map<string, number[]>()
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i]!
+      const key = `${Math.floor(n.x / CELL_SIZE)},${Math.floor(n.y / CELL_SIZE)}`
+      let cell = grid.get(key)
+      if (!cell) {
+        cell = []
+        grid.set(key, cell)
+      }
+      cell.push(i)
+    }
+    const maxDistSq = MAX_CONN_DIST * MAX_CONN_DIST
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i]!
+      const cx = Math.floor(n.x / CELL_SIZE)
+      const cy = Math.floor(n.y / CELL_SIZE)
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const cell = grid.get(`${cx + dx},${cy + dy}`)
+          if (!cell) continue
+          for (let v = 0; v < cell.length; v++) {
+            const j = cell[v]!
+            if (j <= i) continue
+            const n2 = nodes[j]!
+            const ndx = n.x - n2.x
+            const ndy = n.y - n2.y
+            const distSq = ndx * ndx + ndy * ndy
+            if (distSq < maxDistSq) {
+              const nDist = Math.sqrt(distSq)
+              // desvanecido uniforme: la línea se funde al acercarse al cursor y desaparece en su zona
+              const tSeg = Math.max(0, Math.min(1, ((mouse.x - n.x) * ndx + (mouse.y - n.y) * ndy) / Math.max(distSq, 1e-6)))
+              const projX = n.x + tSeg * ndx
+              const projY = n.y + tSeg * ndy
+              const distSeg = Math.hypot(mouse.x - projX, mouse.y - projY)
+              const lengthFade = 1 - Math.min(1, Math.max(0, (nDist - LEN_FADE_START) / (MAX_CONN_DIST - LEN_FADE_START))) * (1 - LEN_FADE_MIN)
+              const alpha = 0.15 * Math.min(1, distSeg / (mouseRadius * LINE_FADE_RADIUS)) * lengthFade
+              ctx.strokeStyle = `rgba(${NODE_RGB}, ${alpha})`
+              ctx.lineWidth = 0.7
+              ctx.beginPath()
+              ctx.moveTo(n.x, n.y)
+              ctx.lineTo(n2.x, n2.y)
+              ctx.stroke()
+            }
+          }
+        }
       }
     }
   }
