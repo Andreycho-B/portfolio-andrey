@@ -21,6 +21,13 @@ const SPACING = 55
 const MAX_CONN_DIST = 75
 const MOUSE_RADIUS = 220
 const COMPACT_MOUSE_RADIUS = 120
+// el desvanecido de las líneas cerca del cursor empieza más lejos que la zona de repulsión
+const LINE_FADE_RADIUS = 1.4
+// las diagonales largas (las "X" que se forman entre celdas) se atenúan extra: son
+// más visibles porque el cruce superpone dos trazos; desde esta longitud hasta el
+// máximo de conexión la opacidad decae hasta LEN_FADE_MIN
+const LEN_FADE_START = 60
+const LEN_FADE_MIN = 0.5
 const NEAR_ZONE = 90
 const COMPACT_NEAR_ZONE = 60
 const SPRING_K = 18
@@ -271,7 +278,8 @@ const render = (now: number) => {
         const projX = n.x + tSeg * ndx
         const projY = n.y + tSeg * ndy
         const distSeg = Math.hypot(mouse.x - projX, mouse.y - projY)
-        const alpha = 0.15 * Math.min(1, distSeg / mouseRadius)
+        const lengthFade = 1 - Math.min(1, Math.max(0, (nDist - LEN_FADE_START) / (MAX_CONN_DIST - LEN_FADE_START))) * (1 - LEN_FADE_MIN)
+        const alpha = 0.15 * Math.min(1, distSeg / (mouseRadius * LINE_FADE_RADIUS)) * lengthFade
         ctx.strokeStyle = `rgba(${NODE_RGB}, ${alpha})`
         ctx.lineWidth = 0.7
         ctx.beginPath()

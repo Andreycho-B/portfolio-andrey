@@ -108,4 +108,11 @@ defineEmits<{ enter: [] }>()
   letter-spacing: 0.35em;
   outline: none;
 }
+
+/* área táctil mínima en móvil (recomendación 44px) */
+@media (max-width: 640px) {
+  .intro-gate__enter {
+    padding: 1.1em 1.6em;
+  }
+}
 </style>
