@@ -12,6 +12,9 @@ useHead({
   ],
   link: [
     { rel: 'icon', type: 'image/svg+xml', href: faviconSvg },
+    { rel: 'preconnect', href: 'https://api.fontshare.com', crossorigin: '' },
+    { rel: 'preconnect', href: 'https://cdn.fontshare.com', crossorigin: '' },
+    { rel: 'stylesheet', href: 'https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,900&display=swap' },
   ],
 })
 </script>
@@ -24,6 +27,29 @@ useHead({
 </template>
 
 <style>
+@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,900&display=swap');
+
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/fonts/CabinetGrotesk-900.woff2') format('woff2');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/fonts/CabinetGrotesk-800.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-display {
+  font-family: 'Cabinet Grotesk', sans-serif !important;
+  font-weight: 900 !important;
+}
+
 html,
 body {
   margin: 0;
