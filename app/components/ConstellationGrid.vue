@@ -65,9 +65,22 @@ const TIER_HYSTERESIS = 60
 const LIGHT_SPACING = 80
 const LIGHT_DPR = 1
 
+export interface CavityPulse {
+  x?: number
+  y?: number
+  radius?: number
+  strength?: number
+  time: number
+}
+
 const props = withDefaults(
-  defineProps<{ active?: boolean; anchor?: readonly [number, number] | null; compact?: boolean }>(),
-  { active: true, anchor: null, compact: false },
+  defineProps<{
+    active?: boolean
+    anchor?: readonly [number, number] | null
+    compact?: boolean
+    pulse?: CavityPulse | null
+  }>(),
+  { active: true, anchor: null, compact: false, pulse: null },
 )
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -355,6 +368,25 @@ const render = (now: number) => {
       const angle = Math.atan2(dy, dx)
       n.vx -= Math.cos(angle) * force * dt
       n.vy -= Math.sin(angle) * force * dt
+    }
+
+    if (props.pulse) {
+      const pAge = (now - props.pulse.time) / 1000
+      if (pAge >= 0 && pAge < 1.4) {
+        const pX = props.pulse.x ?? width * 0.5
+        const pY = props.pulse.y ?? height * 0.5
+        const pRadius = props.pulse.radius ?? Math.min(width, height) * 0.55
+        const pStrength = props.pulse.strength ?? 800
+        const pDecay = Math.exp(-4.2 * pAge)
+        const pdx = n.x - pX
+        const pdy = n.y - pY
+        const pDist = Math.hypot(pdx, pdy)
+        if (pDist < pRadius && pDist > 0.1) {
+          const push = (1 - pDist / pRadius) * pStrength * pDecay
+          n.vx += (pdx / pDist) * push * dt
+          n.vy += (pdy / pDist) * push * dt
+        }
+      }
     }
 
     const homeDx = n.baseX - n.x

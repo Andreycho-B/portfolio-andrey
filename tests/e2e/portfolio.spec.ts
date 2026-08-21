@@ -23,7 +23,7 @@ test('gate visible en carga con constelación activa', async ({ page }) => {
   const errors = collectConsoleErrors(page)
   await page.goto('/')
 
-  await expect(page.getByRole('button', { name: ENTER_BUTTON })).toBeVisible()
+  await expect(page.getByRole('button', { name: ENTER_BUTTON })).toBeVisible({ timeout: 10_000 })
   await expect(page.locator(GATE)).toBeVisible()
   await expect(page.locator(CONSTELLATION)).toHaveCount(1)
   await expect(page.locator(CONSTELLATION_LINES)).toHaveCount(1)
@@ -67,7 +67,7 @@ test('mobile 390×844 sin overflow', async ({ browser }) => {
   const errors = collectConsoleErrors(page)
   await page.goto('/')
 
-  await expect(page.getByRole('button', { name: ENTER_BUTTON })).toBeVisible()
+  await expect(page.getByRole('button', { name: ENTER_BUTTON })).toBeVisible({ timeout: 10_000 })
   const hasOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth,
   )

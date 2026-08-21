@@ -19,10 +19,28 @@ useHead({
     },
     {
       rel: 'preload',
+      href: '/fonts/CabinetGrotesk-800.woff2',
+      as: 'font',
+      type: 'font/woff2',
+      crossorigin: '',
+    },
+    {
+      rel: 'preload',
+      href: '/fonts/CabinetGrotesk-900.woff2',
+      as: 'font',
+      type: 'font/woff2',
+      crossorigin: '',
+    },
+    {
+      rel: 'preload',
       href: '/fonts/LeMurmure-Regular.woff2',
       as: 'font',
       type: 'font/woff2',
       crossorigin: '',
+    },
+    {
+      rel: 'stylesheet',
+      href: 'https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,900&display=swap',
     },
   ],
 })
