@@ -53,6 +53,8 @@ const FLOW_DECAY = 1.4
 const WHEEL_SCALE = 16
 const NODE_RGB = '0, 102, 255'
 const ACCENT_RGB = '0, 102, 255'
+const EXCLUSION_FADE = 28
+const EXCLUSION_PADDING = 6
 // capa de lineas: se dibuja solo cuando cambian (cursor activo, nodos en
 // movimiento o dirty tras resize/tier); en reposo persiste del ultimo frame,
 // sin parpadeo ni re-dibujo (el canvas de nodos se limpia aparte, arriba)
@@ -73,14 +75,22 @@ export interface CavityPulse {
   time: number
 }
 
+export interface ExclusionRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 const props = withDefaults(
   defineProps<{
     active?: boolean
     anchor?: readonly [number, number] | null
     compact?: boolean
     pulse?: CavityPulse | null
+    exclusion?: ExclusionRect | null
   }>(),
-  { active: true, anchor: null, compact: false, pulse: null },
+  { active: true, anchor: null, compact: false, pulse: null, exclusion: null },
 )
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -452,7 +462,19 @@ const render = (now: number) => {
               const projY = n.y + tSeg * ndy
               const distSeg = Math.hypot(mouse.x - projX, mouse.y - projY)
               const lengthFade = 1 - Math.min(1, Math.max(0, (nDist - LEN_FADE_START) / (MAX_CONN_DIST - LEN_FADE_START))) * (1 - LEN_FADE_MIN)
-              const alpha = 0.15 * Math.min(1, distSeg / (mouseRadius * LINE_FADE_RADIUS)) * lengthFade
+              let exclusionFadeLine = 1
+              if (props.exclusion) {
+                const mx = (n.x + n2.x) * 0.5
+                const my = (n.y + n2.y) * 0.5
+                const halfW = props.exclusion.w * 0.5 + EXCLUSION_PADDING
+                const halfH = props.exclusion.h * 0.5 + EXCLUSION_PADDING
+                const edx = Math.max(Math.abs(mx - props.exclusion.x) - halfW, 0)
+                const edy = Math.max(Math.abs(my - props.exclusion.y) - halfH, 0)
+                const distEx = Math.hypot(edx, edy)
+                exclusionFadeLine = Math.min(1, distEx / EXCLUSION_FADE)
+              }
+              const alpha = 0.15 * Math.min(1, distSeg / (mouseRadius * LINE_FADE_RADIUS)) * lengthFade * exclusionFadeLine
+              if (alpha < 0.001) continue
               lineCtx.strokeStyle = `rgba(${NODE_RGB}, ${alpha})`
               lineCtx.lineWidth = 0.7
               lineCtx.beginPath()
@@ -473,7 +495,19 @@ const render = (now: number) => {
     const dist = Math.sqrt(dx * dx + dy * dy)
     const isNear = dist < mouseRadius
 
-    const baseAlpha = 1
+    // fade suave cerca del CTA (opción B): desvanecido sin desplazar nodos
+    let exclusionFade = 1
+    if (props.exclusion) {
+      const halfW = props.exclusion.w * 0.5 + EXCLUSION_PADDING
+      const halfH = props.exclusion.h * 0.5 + EXCLUSION_PADDING
+      const edx = Math.max(Math.abs(n.x - props.exclusion.x) - halfW, 0)
+      const edy = Math.max(Math.abs(n.y - props.exclusion.y) - halfH, 0)
+      const distEx = Math.hypot(edx, edy)
+      exclusionFade = Math.min(1, distEx / EXCLUSION_FADE)
+      if (exclusionFade <= 0.01) continue
+    }
+
+    const baseAlpha = 1 * exclusionFade
     ctx.fillStyle = isNear ? `rgba(${ACCENT_RGB}, ${baseAlpha})` : `rgba(${NODE_RGB}, ${baseAlpha})`
     const currentRadius = isNear ? n.radius * 2.2 : n.radius + Math.sin(n.pulse) * 0.3
     ctx.beginPath()
@@ -482,15 +516,17 @@ const render = (now: number) => {
 
     if (dist < nearZone) {
       const pulseRing = ((n.pulse * 20) % 30) + 4
-      const ringAlpha = (1 - pulseRing / 34) * 0.4
-      ctx.strokeStyle = `rgba(${ACCENT_RGB}, ${ringAlpha})`
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.arc(n.x, n.y, pulseRing, 0, Math.PI * 2)
-      ctx.stroke()
+      const ringAlpha = (1 - pulseRing / 34) * 0.4 * exclusionFade
+      if (ringAlpha > 0.01) {
+        ctx.strokeStyle = `rgba(${ACCENT_RGB}, ${ringAlpha})`
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.arc(n.x, n.y, pulseRing, 0, Math.PI * 2)
+        ctx.stroke()
+      }
 
       ctx.font = '8px ui-monospace, SFMono-Regular, Consolas, monospace'
-      ctx.fillStyle = `rgba(${ACCENT_RGB}, 0.85)`
+      ctx.fillStyle = `rgba(${ACCENT_RGB}, ${0.85 * exclusionFade})`
       ctx.fillText(n.label, n.x + 10, n.y - 10)
     }
   }

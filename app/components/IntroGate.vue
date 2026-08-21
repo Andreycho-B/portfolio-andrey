@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ConstellationGrid from './ConstellationGrid.vue'
 import GreetingShader from './GreetingShader.vue'
-import type { CavityPulse } from './ConstellationGrid.vue'
+import type { CavityPulse, ExclusionRect } from './ConstellationGrid.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -152,6 +152,28 @@ const ctaTranslateY = ref(0)
 const ctaInteractable = ref(true)
 
 const cavityPulseData = ref<CavityPulse | null>(null)
+
+const ctaSecondaryRef = ref<HTMLElement | null>(null)
+const ctaExclusion = ref<ExclusionRect | null>(null)
+
+const updateCtaExclusion = () => {
+  const el = ctaSecondaryRef.value
+  if (!el) {
+    ctaExclusion.value = null
+    return
+  }
+  const rect = el.getBoundingClientRect()
+  if (rect.width === 0 && rect.height === 0) {
+    ctaExclusion.value = null
+    return
+  }
+  ctaExclusion.value = {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+    w: rect.width,
+    h: rect.height,
+  }
+}
 
 let rafId = 0
 let startTime = 0
@@ -418,9 +440,21 @@ const onClick = (soundEnabled = true) => {
   emit('enter', soundEnabled)
 }
 
+let ctaResizeObserver: ResizeObserver | null = null
+
 onMounted(() => {
   if (typeof window !== 'undefined') {
     startAnimation()
+    // medir CTA tras layout para el fade de constelación (opción B)
+    requestAnimationFrame(() => {
+      updateCtaExclusion()
+      requestAnimationFrame(updateCtaExclusion)
+    })
+    window.addEventListener('resize', updateCtaExclusion)
+    if (typeof ResizeObserver !== 'undefined' && ctaSecondaryRef.value) {
+      ctaResizeObserver = new ResizeObserver(updateCtaExclusion)
+      ctaResizeObserver.observe(ctaSecondaryRef.value)
+    }
   }
 })
 
@@ -430,6 +464,7 @@ watch(
     if (active) {
       startTime = performance.now()
       startAnimation()
+      requestAnimationFrame(updateCtaExclusion)
     } else {
       stopAnimation()
     }
@@ -438,12 +473,17 @@ watch(
 
 onBeforeUnmount(() => {
   stopAnimation()
+  window.removeEventListener('resize', updateCtaExclusion)
+  if (ctaResizeObserver) {
+    ctaResizeObserver.disconnect()
+    ctaResizeObserver = null
+  }
 })
 </script>
 
 <template>
   <section class="intro-gate">
-    <ConstellationGrid :active="active" :pulse="cavityPulseData" />
+    <ConstellationGrid :active="active" :pulse="cavityPulseData" :exclusion="ctaExclusion" />
 
     <div class="intro-gate__kinetic-stage" aria-live="polite">
       <!-- FASE 1: THE GREETING (WebGL Extreme Culture Hourglass Shader + Fluid Melt) -->
@@ -512,6 +552,7 @@ onBeforeUnmount(() => {
 
       <!-- CTA Secundario (Texto con subrayado) -->
       <button
+        ref="ctaSecondaryRef"
         class="cta-secondary"
         type="button"
         @click="onClick(false)"
@@ -685,7 +726,7 @@ onBeforeUnmount(() => {
 /* DUAL CTA (Posicionado debajo del bloque principal a Y ≈ 84%) */
 .intro-gate__cta-container {
   position: absolute;
-  top: 85%;
+  top: 88%;
   left: 50%;
   z-index: 5;
   display: flex;
@@ -707,10 +748,10 @@ onBeforeUnmount(() => {
   font-size: 0.8125rem;
   letter-spacing: 0.22em;
   color: #15131a;
-  background-color: transparent;
+  background-color: #ffffff;
   border: 1.5px solid #15131a;
   border-radius: 9999px;
-  padding: 0.75rem 2.2rem;
+  padding: 0.75rem 1.6rem 0.75rem calc(1.6rem + 0.11em);
   min-height: 44px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -732,16 +773,27 @@ onBeforeUnmount(() => {
   font-size: 0.75rem;
   letter-spacing: 0.15em;
   color: #71717a;
-  text-decoration: underline;
-  text-underline-offset: 4px;
   padding: 0.4rem 0.8rem;
   min-height: 32px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   outline: none;
-  transition:
-    color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-    text-underline-offset 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cta-secondary::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 0;
+  height: 1px;
+  background: currentColor;
+  border-radius: 9999px;
+  transform: translateX(-50%);
+  transition: width 0.55s linear;
+  will-change: width;
+  pointer-events: none;
 }
 
 @media (hover: hover) {
@@ -759,8 +811,12 @@ onBeforeUnmount(() => {
   .cta-secondary:hover,
   .cta-secondary:focus-visible {
     color: #15131a;
-    text-underline-offset: 6px;
   }
+}
+
+.cta-secondary:hover::after,
+.cta-secondary:focus-visible::after {
+  width: calc(100% - 1.6rem);
 }
 
 .cta-pill:focus-visible {
@@ -772,6 +828,20 @@ onBeforeUnmount(() => {
   outline: 2px auto #0066ff;
 }
 
+.cta-secondary:active {
+  color: #15131a;
+}
+
+.cta-secondary:active::after {
+  width: calc(100% - 1.6rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta-secondary::after {
+    transition: none;
+  }
+}
+
 /* RESPONSIVE BREAKPOINTS (Mobile 320px - 430px) */
 @media (max-width: 640px) {
   .kinetic-resolution {
@@ -779,14 +849,14 @@ onBeforeUnmount(() => {
   }
 
   .intro-gate__cta-container {
-    top: 76%;
+    top: 79%;
     width: 90vw;
   }
 
   .cta-pill {
-    padding: 0.85rem 1.8rem;
+    padding: 0.85rem 1.4rem 0.85rem calc(1.4rem + 0.11em);
     width: 100%;
-    max-width: 280px;
+    max-width: 250px;
   }
 }
 </style>
