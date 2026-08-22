@@ -104,7 +104,8 @@ const handleClick = (e: MouseEvent) => {
   justify-content: center;
   background: #ffffff;
   border: 1px solid #15131a;
-  border-radius: 9999px;
+  border-radius: 16px;
+  corner-shape: squircle;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
