@@ -12,10 +12,10 @@ export default defineNuxtConfig({
 
   vite: {
     optimizeDeps: {
-      include: ['three', '@paper-design/shaders'],
+      include: ['three'],
     },
     ssr: {
-      noExternal: ['three', '@paper-design/shaders'],
+      noExternal: ['three'],
     },
   },
 })

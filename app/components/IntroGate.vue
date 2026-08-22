@@ -22,11 +22,12 @@ const cavityPulseData = ref<CavityPulse | null>(null)
 
 const ctaContainerRef = ref<HTMLElement | null>(null)
 const ctaSecondaryRef = ref<HTMLElement | null>(null)
+const ctaSecondaryTextRef = ref<HTMLElement | null>(null)
 const ctaExclusion = ref<ExclusionRect | null>(null)
-const isCtaSoundHovered = ref(false)
 
 const updateCtaExclusion = () => {
-  const el = ctaContainerRef.value || ctaSecondaryRef.value
+  // Medir solo el glifo del texto, no el botón (44px), para no abrir caja arriba/abajo
+  const el = ctaSecondaryTextRef.value || ctaSecondaryRef.value
   if (!el) {
     ctaExclusion.value = null
     return
@@ -39,8 +40,8 @@ const updateCtaExclusion = () => {
   ctaExclusion.value = {
     x: rect.left + rect.width / 2,
     y: rect.top + rect.height / 2,
-    w: rect.width + 16,
-    h: rect.height + 8,
+    w: rect.width,
+    h: rect.height,
   }
 }
 
@@ -174,7 +175,10 @@ onMounted(() => {
       requestAnimationFrame(updateCtaExclusion)
     })
     window.addEventListener('resize', updateCtaExclusion)
-    if (typeof ResizeObserver !== 'undefined' && ctaSecondaryRef.value) {
+    if (typeof ResizeObserver !== 'undefined' && ctaSecondaryTextRef.value) {
+      ctaResizeObserver = new ResizeObserver(updateCtaExclusion)
+      ctaResizeObserver.observe(ctaSecondaryTextRef.value)
+    } else if (typeof ResizeObserver !== 'undefined' && ctaSecondaryRef.value) {
       ctaResizeObserver = new ResizeObserver(updateCtaExclusion)
       ctaResizeObserver.observe(ctaSecondaryRef.value)
     }
@@ -221,31 +225,9 @@ onBeforeUnmount(() => {
 
     <!-- SECCIÓN CTA (Posicionado a Y ≈ 78%-88%) -->
     <div ref="ctaContainerRef" class="intro-gate__cta-container">
-      <div
-        class="intro-gate__cta-row"
-        @mouseenter="isCtaSoundHovered = true"
-        @mouseleave="isCtaSoundHovered = false"
-      >
-        <!-- CTA Principal (Liquid Metal Button con Kinetic Rolling Text) -->
-        <LiquidMetalButton
-          :active="active"
-          :hovered="isCtaSoundHovered"
-          label="ingresar con sonido"
-          @hover-change="isCtaSoundHovered = $event"
-          @click="onClick(true)"
-          @pointerup="onPointerUp($event, true)"
-        />
-
-        <!-- CTA Circular Acompañante con Icono de Altavoz -->
-        <LiquidMetalButton
-          :active="active"
-          :hovered="isCtaSoundHovered"
-          view-mode="icon"
-          aria-label="activar sonido"
-          @hover-change="isCtaSoundHovered = $event"
-          @click="onClick(true)"
-          @pointerup="onPointerUp($event, true)"
-        />
+      <div class="intro-gate__cta-row">
+        <!-- CTA Principal (Botón minimalista) -->
+        <LiquidMetalButton label="ingresar con sonido" @click="onClick(true)" @pointerup="onPointerUp($event, true)" />
       </div>
 
       <!-- CTA Secundario (Texto con línea inferior que expande desde el centro) -->
@@ -256,7 +238,7 @@ onBeforeUnmount(() => {
         @click="onClick(false)"
         @pointerup="onPointerUp($event, false)"
       >
-        <span class="cta-secondary__text">ingresar sin sonido</span>
+        <span ref="ctaSecondaryTextRef" class="cta-secondary__text">ingresar sin sonido</span>
       </button>
     </div>
   </section>
