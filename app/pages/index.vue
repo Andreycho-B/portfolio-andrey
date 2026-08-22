@@ -38,10 +38,6 @@ useHead({
       type: 'font/woff2',
       crossorigin: '',
     },
-    {
-      rel: 'stylesheet',
-      href: 'https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,900&display=swap',
-    },
   ],
 })
 

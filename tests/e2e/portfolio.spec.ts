@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test'
 // gate. Cada test verifica además 0 errores de consola (regla del proyecto).
 
 const ENTER_BUTTON = 'ingresar con sonido'
+const ENTER_SILENT_BUTTON = 'ingresar sin sonido'
 const GATE = '.intro-gate'
 const GATE_HIDDEN = '.intro-gate--hidden'
 const WEBGL_CANVAS = '.webgl-canvas'
@@ -24,6 +25,7 @@ test('gate visible en carga con constelación activa', async ({ page }) => {
   await page.goto('/')
 
   await expect(page.getByRole('button', { name: ENTER_BUTTON })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('button', { name: ENTER_SILENT_BUTTON })).toBeVisible({ timeout: 10_000 })
   await expect(page.locator(GATE)).toBeVisible()
   await expect(page.locator(CONSTELLATION)).toHaveCount(1)
   await expect(page.locator(CONSTELLATION_LINES)).toHaveCount(1)
@@ -46,6 +48,19 @@ test('enter: gate oculto + escena WebGL + tarjeta', async ({ page }) => {
 
   // URL limpia sin hash
   await expect.poll(() => page.url()).not.toContain('#')
+  expect(errors).toEqual([])
+})
+
+test('enter con botón secundario: ingresar sin sonido', async ({ page }) => {
+  const errors = collectConsoleErrors(page)
+  await page.goto('/')
+
+  await expect(page.getByRole('button', { name: ENTER_SILENT_BUTTON })).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('button', { name: ENTER_SILENT_BUTTON }).click()
+
+  await expect(page.locator(GATE)).toHaveClass(/intro-gate--hidden/, { timeout: 5_000 })
+  await expect(page.locator(GATE)).toBeHidden({ timeout: 5_000 })
+  await expect(page.locator(WEBGL_CANVAS)).toBeVisible()
   expect(errors).toEqual([])
 })
 

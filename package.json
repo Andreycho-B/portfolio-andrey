@@ -12,6 +12,7 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
+    "@paper-design/shaders": "^0.0.80",
     "nuxt": "^4.5.2",
     "nuxt-security": "^2.6.0",
     "three": "0.185.1",
