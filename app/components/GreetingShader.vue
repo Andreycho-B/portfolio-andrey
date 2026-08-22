@@ -711,7 +711,7 @@ const disposeScene = () => {
 }
 
 onMounted(() => {
-  if (typeof window !== 'undefined' && props.active) {
+  if (typeof window !== 'undefined' && props.active && !renderer) {
     initScene()
   }
 })
@@ -723,11 +723,13 @@ onBeforeUnmount(() => {
 watch(
   () => props.active,
   (active) => {
-    if (!active) {
+    if (active) {
+      if (!renderer) {
+        isDisposed = false
+        initScene()
+      }
+    } else {
       disposeScene()
-    } else if (isDisposed) {
-      isDisposed = false
-      initScene()
     }
   },
 )
