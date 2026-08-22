@@ -573,6 +573,14 @@ watch(
   },
 )
 
+watch(
+  () => props.exclusion,
+  () => {
+    linesDirty = true
+  },
+  { deep: true },
+)
+
 onBeforeUnmount(() => {
   stopLoop()
   window.removeEventListener('resize', handleResize)

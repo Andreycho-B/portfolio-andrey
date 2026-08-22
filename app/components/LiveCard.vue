@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import * as THREE from 'three'
+import { shallowRef, watch } from 'vue'
 import type { SceneContext } from '~/components/WebGLScene.vue'
 
 // Tarjeta tipo fotografía impresa (polaroid) compuesta en canvas 2D con las fuentes
@@ -33,6 +34,7 @@ const props = withDefaults(
 
 const meshRef = shallowRef<THREE.Mesh | null>(null)
 
+let cardCanvas: HTMLCanvasElement | null = null
 let texture: THREE.CanvasTexture | null = null
 let material: THREE.MeshBasicMaterial | null = null
 let geometry: THREE.PlaneGeometry | null = null
@@ -58,6 +60,8 @@ const drawRoundedRect = (
 const drawCard = (canvas: HTMLCanvasElement) => {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
+
+  ctx.clearRect(0, 0, CARD_W, CARD_H)
 
   // sombra suave de la fotografía impresa
   ctx.save()
@@ -131,7 +135,27 @@ const reposition = () => {
   if (!mesh || !camera) return
   const halfWidth = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.z * camera.aspect
   mesh.position.x = Math.min(props.position[0], halfWidth - CARD_HALF_W - EDGE_MARGIN)
+  mesh.position.y = props.position[1]
+  mesh.position.z = props.position[2]
 }
+
+watch(
+  [() => props.name, () => props.index, () => props.color],
+  () => {
+    if (cardCanvas && texture) {
+      drawCard(cardCanvas)
+      texture.needsUpdate = true
+    }
+  },
+)
+
+watch(
+  () => props.position,
+  () => {
+    reposition()
+  },
+  { deep: true },
+)
 
 onMounted(async () => {
   try {
@@ -145,12 +169,12 @@ onMounted(async () => {
   }
   if (disposed) return
 
-  const canvas = document.createElement('canvas')
-  canvas.width = CARD_W
-  canvas.height = CARD_H
-  drawCard(canvas)
+  cardCanvas = document.createElement('canvas')
+  cardCanvas.width = CARD_W
+  cardCanvas.height = CARD_H
+  drawCard(cardCanvas)
 
-  texture = new THREE.CanvasTexture(canvas)
+  texture = new THREE.CanvasTexture(cardCanvas)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.anisotropy = 4
   texture.needsUpdate = true
@@ -172,6 +196,7 @@ onBeforeUnmount(() => {
   geometry?.dispose()
   material?.dispose()
   texture?.dispose()
+  cardCanvas = null
 })
 </script>
 
@@ -180,20 +205,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@font-face {
-  font-family: 'Le Murmure';
-  src: url('/fonts/LeMurmure-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Space Grotesk Variable';
-  src: url('/fonts/space-grotesk-variable.woff2') format('woff2');
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
 .live-card {
   display: none;
 }

@@ -12,9 +12,6 @@ useHead({
   ],
   link: [
     { rel: 'icon', type: 'image/svg+xml', href: faviconSvg },
-    { rel: 'preconnect', href: 'https://api.fontshare.com', crossorigin: '' },
-    { rel: 'preconnect', href: 'https://cdn.fontshare.com', crossorigin: '' },
-    { rel: 'stylesheet', href: 'https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,900&display=swap' },
   ],
 })
 </script>
@@ -27,8 +24,6 @@ useHead({
 </template>
 
 <style>
-@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,900&display=swap');
-
 @font-face {
   font-family: 'Cabinet Grotesk';
   src: url('/fonts/CabinetGrotesk-900.woff2') format('woff2');
@@ -41,6 +36,22 @@ useHead({
   font-family: 'Cabinet Grotesk';
   src: url('/fonts/CabinetGrotesk-800.woff2') format('woff2');
   font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Grotesk Variable';
+  src: url('/fonts/space-grotesk-variable.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Le Murmure';
+  src: url('/fonts/LeMurmure-Regular.woff2') format('woff2');
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
