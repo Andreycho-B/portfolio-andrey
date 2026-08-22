@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import WebGLScene from '~/components/WebGLScene.vue'
-import LiveCard from '~/components/LiveCard.vue'
 import IntroGate from '~/components/IntroGate.vue'
 import type { SceneContext } from '~/components/WebGLScene.vue'
 
@@ -122,15 +121,7 @@ onUnmounted(() => {
         :camera-x="0"
         @webgl-unsupported="handleWebGLUnsupported"
         @scene-ready="handleSceneReady"
-      >
-        <LiveCard
-          v-if="sceneCtx"
-          :ctx="sceneCtx"
-          name="AI ESTANDAR"
-          index="01 — 2025"
-          color="#0066ff"
-        />
-      </WebGLScene>
+      />
 
       <div v-if="!webglSupported" class="fallback">
         <h1 class="portfolio-text">portfolio</h1>

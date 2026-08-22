@@ -53,8 +53,8 @@ const FLOW_DECAY = 1.4
 const WHEEL_SCALE = 16
 const NODE_RGB = '0, 102, 255'
 const ACCENT_RGB = '0, 102, 255'
-const EXCLUSION_FADE = 28
-const EXCLUSION_PADDING = 6
+const EXCLUSION_FADE = 10
+const EXCLUSION_PADDING = 0
 // capa de lineas: se dibuja solo cuando cambian (cursor activo, nodos en
 // movimiento o dirty tras resize/tier); en reposo persiste del ultimo frame,
 // sin parpadeo ni re-dibujo (el canvas de nodos se limpia aparte, arriba)
