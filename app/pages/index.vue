@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import WebGLScene from '~/components/WebGLScene.vue'
 import IntroGate from '~/components/IntroGate.vue'
+import ContraRibbonCarousel from '~/components/ContraRibbonCarousel.vue'
+import ProjectsList from '~/components/ProjectsList.vue'
 import type { SceneContext } from '~/components/WebGLScene.vue'
 
 useHead({
@@ -81,6 +83,7 @@ const pauseAudio = () => {
 
 const dismissIntro = (soundEnabled?: boolean) => {
   if (!introVisible.value) return
+  sceneCtx.value = null
   introVisible.value = false
   introEntering.value = false
   history.pushState({ view: 'portfolio' }, '', location.pathname)
@@ -95,6 +98,7 @@ const dismissIntro = (soundEnabled?: boolean) => {
 
 const showIntro = () => {
   introVisible.value = true
+  sceneCtx.value = null
   pauseAudio()
   closeMenu()
 }
@@ -103,6 +107,7 @@ const handlePopState = (e: PopStateEvent) => {
   const nextVisible = !e.state || e.state.view !== 'portfolio'
   introVisible.value = nextVisible
   if (nextVisible) {
+    sceneCtx.value = null
     pauseAudio()
     closeMenu()
   }
@@ -113,6 +118,7 @@ const handlePopState = (e: PopStateEvent) => {
 const handlePageShow = (e: PageTransitionEvent) => {
   if (e.persisted) {
     introVisible.value = true
+    sceneCtx.value = null
     pauseAudio()
     closeMenu()
   }
@@ -127,6 +133,16 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 const handleSceneReady = (ctx: SceneContext) => {
   sceneCtx.value = ctx
+  if (typeof window !== 'undefined') {
+    ;(window as any).__sceneCtx = ctx
+  }
+}
+
+const handleSceneDestroyed = () => {
+  sceneCtx.value = null
+  if (typeof window !== 'undefined') {
+    delete (window as any).__sceneCtx
+  }
 }
 
 const handleWebGLUnsupported = () => {
@@ -164,6 +180,7 @@ onMounted(() => {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       introVisible.value = true
+      sceneCtx.value = null
       setTimeout(() => {
         introEntering.value = false
       }, INTRO_ENTER_TIMEOUT)
@@ -195,11 +212,42 @@ onUnmounted(() => {
         v-if="webglSupported && !introVisible"
         :clear-color="0xffffff"
         :fov="72"
-        :camera-z="3.8"
+        :camera-z="4.6"
         :camera-x="0"
         @webgl-unsupported="handleWebGLUnsupported"
         @scene-ready="handleSceneReady"
+        @scene-destroyed="handleSceneDestroyed"
       />
+
+
+      <!-- Carrusel Continuo en Hilera con formas calibradas 1:1 (Contra Ribbon) -->
+      <ContraRibbonCarousel
+        v-if="!introVisible"
+        :ctx="sceneCtx"
+        :paused="viewMode === 'list'"
+        :style="{
+          opacity: viewMode === 'list' ? 0 : 1,
+          pointerEvents: viewMode === 'list' ? 'none' : 'auto',
+          transition: 'opacity 0.35s ease'
+        }"
+      />
+
+      <!-- Bloque de Marca Central Emblemático -->
+      <div v-if="!introVisible && viewMode === 'carousel'" class="contra-aperture-brand" aria-hidden="true">
+        <span class="contra-aperture-brand__text">GET MORE CREATIVE</span>
+        <svg class="contra-aperture-brand__star" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0L14.4 9.6L24 12L14.4 14.4L12 24L9.6 14.4L0 12L9.6 9.6L12 0Z" />
+        </svg>
+        <span class="contra-aperture-brand__logo">contra</span>
+      </div>
+
+      <!-- Vista de Lista de Proyectos -->
+      <Transition name="list-view">
+        <ProjectsList
+          v-if="!introVisible && viewMode === 'list'"
+          @close="viewMode = 'carousel'"
+        />
+      </Transition>
 
       <button
         v-if="!introVisible"
@@ -345,7 +393,7 @@ onUnmounted(() => {
   position: absolute;
   left: 16px;
   bottom: 16px;
-  z-index: 5;
+  z-index: 25;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -563,7 +611,7 @@ onUnmounted(() => {
   left: 24px;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 5;
+  z-index: 25;
   display: inline-flex;
   align-items: center;
   gap: 14px;
@@ -583,12 +631,9 @@ onUnmounted(() => {
   transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.view-toggle__btn--carousel {
-  font-weight: 700;
-}
-
+.view-toggle__btn--carousel,
 .view-toggle__btn--list {
-  font-weight: 300;
+  font-weight: 500;
 }
 
 .view-toggle__btn:focus-visible {
@@ -596,19 +641,16 @@ onUnmounted(() => {
   outline-offset: 3px;
 }
 
-/* rojo solo para carrusel */
-.view-toggle__btn--carousel.view-toggle__btn--active {
-  color: #ff1818;
+/* botón activo en rojo */
+.view-toggle__btn--active {
+  color: #ff1818 !important;
+  font-weight: 700;
+  opacity: 1;
 }
 
-.view-toggle__btn--carousel:not(.view-toggle__btn--active) {
+.view-toggle__btn:not(.view-toggle__btn--active) {
   color: #15131a;
-}
-
-/* lista sin color: gris neutro, nunca rojo ni azul */
-.view-toggle__btn--list,
-.view-toggle__btn--list.view-toggle__btn--active {
-  color: #9ca3af;
+  opacity: 0.6;
 }
 
 .view-toggle__dot {
@@ -621,31 +663,48 @@ onUnmounted(() => {
 }
 
 @media (hover: hover) {
-  .view-toggle__btn--carousel:hover {
+  .view-toggle__btn:not(.view-toggle__btn--active):hover {
     color: #0066ff;
-  }
-  .view-toggle__btn--carousel.view-toggle__btn--active:hover {
-    color: #ff1818;
-  }
-  .view-toggle__btn--list:hover {
-    color: #9ca3af;
+    opacity: 1;
   }
 }
 
-@media (max-width: 640px) {
+.list-view-enter-active {
+  transition:
+    opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.list-view-leave-active {
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.list-view-enter-from {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+.list-view-leave-to {
+  opacity: 0;
+  transform: translateY(-12px);
+}
+
+@media (max-width: 768px) {
   .view-toggle {
     left: 16px;
-    top: 50%;
+    top: 22px;
     bottom: auto;
-    transform: translateY(-50%);
+    transform: none;
     gap: 10px;
   }
   .view-toggle__btn {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
   }
   .view-toggle__dot {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
   }
 }
 
@@ -895,6 +954,66 @@ onUnmounted(() => {
   .note-body p {
     font-size: 0.8125rem;
     line-height: 1.75;
+  }
+}
+
+.contra-aperture-brand {
+  position: absolute;
+  left: clamp(60%, 71vw, 78%);
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 2;
+  pointer-events: none;
+  user-select: none;
+}
+
+.contra-aperture-brand__text {
+  font-family: 'Space Grotesk Variable', sans-serif;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #15131a;
+  white-space: nowrap;
+}
+
+.contra-aperture-brand__star {
+  width: 18px;
+  height: 18px;
+  color: #15131a;
+  flex-shrink: 0;
+}
+
+.contra-aperture-brand__logo {
+  font-family: 'CabinetGrotesk-900', 'Space Grotesk Variable', sans-serif;
+  font-weight: 900;
+  font-size: 1.5rem;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  text-transform: lowercase;
+  color: #15131a;
+}
+
+@media (max-width: 768px) {
+  .contra-aperture-brand {
+    right: auto;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    gap: 12px;
+  }
+  .contra-aperture-brand__text {
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+  }
+  .contra-aperture-brand__star {
+    width: 14px;
+    height: 14px;
+  }
+  .contra-aperture-brand__logo {
+    font-size: 1.25rem;
   }
 }
 </style>

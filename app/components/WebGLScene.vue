@@ -28,6 +28,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'scene-ready': [context: SceneContext]
+  'scene-destroyed': []
   'webgl-unsupported': []
 }>()
 
@@ -221,6 +222,7 @@ const disposeAll = () => {
   }
   renderCallbacks.length = 0
   resizeCallbacks.length = 0
+  emit('scene-destroyed')
   scene?.traverse((obj) => {
     if (obj instanceof THREE.Mesh) {
       obj.geometry?.dispose()
